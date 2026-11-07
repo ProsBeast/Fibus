@@ -1,0 +1,4 @@
+node_modules/
+# Never commit service-account keys.
+*-admin*.json
+*service-account*.json

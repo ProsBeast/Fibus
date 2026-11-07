@@ -1,0 +1,50 @@
+// Fibus Realtime Database rules (PRD FR-04, FR-06, FR-14, section 12).
+// Anything not matched below is denied.
+{
+  "rules": {
+    // Admin-written mirror of Firestore operatorAssignments:
+    //   busOperators/{busId}/{uid} = true
+    // RTDB rules cannot read Firestore, so tracker writes are authorised here.
+    "busOperators": {
+      "$busId": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid"
+        }
+      }
+    },
+
+    "liveBuses": {
+      "$busId": {
+        ".read": "auth != null",
+
+        // Only an operator assigned to this bus may write, and only as itself.
+        // It may keep updating its own session (same generation), or claim a new
+        // session (higher generation) when the feed is its own, ended, or has had
+        // no heartbeat for 60s. A superseded operator's writes are rejected.
+        ".write": "auth != null && root.child('busOperators').child($busId).child(auth.uid).val() === true && newData.exists() && newData.child('operatorUid').val() === auth.uid && ((data.child('operatorUid').val() === auth.uid && newData.child('sessionGeneration').val() === data.child('sessionGeneration').val()) || ((!data.exists() || newData.child('sessionGeneration').val() > data.child('sessionGeneration').val()) && (!data.exists() || data.child('operatorUid').val() === auth.uid || data.child('status').val() === 'ended' || !data.child('lastServerHeartbeat').exists() || data.child('lastServerHeartbeat').val() < now - 60000)))",
+
+        "operatorUid": { ".validate": "newData.isString()" },
+        "sessionGeneration": { ".validate": "newData.isNumber() && newData.val() >= 1" },
+        "status": { ".validate": "newData.isString() && (newData.val() === 'tracking' || newData.val() === 'stale' || newData.val() === 'ended')" },
+        "latitude": { ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90" },
+        "longitude": { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
+        "accuracy": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "speed": { ".validate": "newData.isNumber()" },
+        "heading": { ".validate": "newData.isNumber()" },
+        "timestamp": { ".validate": "newData.isNumber()" },
+        "lastServerHeartbeat": { ".validate": "newData.isNumber() && (newData.val() === now || newData.val() === data.val())" },
+        "busId": { ".validate": "newData.isString() && newData.val() === $busId" },
+        "busEta": {
+          "$stopId": { ".validate": "newData.isNumber()" }
+        }
+      }
+    },
+
+    "activeSessions": {
+      "$busId": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('busOperators').child($busId).child(auth.uid).val() === true && newData.exists() && newData.child('operatorUid').val() === auth.uid && (!data.exists() || data.child('operatorUid').val() === auth.uid || newData.child('sessionGeneration').val() > data.child('sessionGeneration').val())"
+      }
+    }
+  }
+}

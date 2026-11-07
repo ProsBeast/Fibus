@@ -1,0 +1,39 @@
+{
+  "projectId": "fibus-84a9b",
+  "databaseURL": "https://fibus-84a9b-default-rtdb.asia-southeast1.firebasedatabase.app",
+  "timeZone": "Asia/Kolkata",
+
+  "stops": [
+    { "id": "isnapur",      "name": "Isnapur Cross Roads", "latitude": 17.54650, "longitude": 78.21319, "sequenceIndex": 0, "scheduledArrivalLocalTime": "07:30" },
+    { "id": "patancheru",   "name": "Patancheru",          "latitude": 17.52861, "longitude": 78.26743, "sequenceIndex": 1, "scheduledArrivalLocalTime": "07:44" },
+    { "id": "rc_puram",     "name": "R C Puram",           "latitude": 17.50632, "longitude": 78.30525, "sequenceIndex": 2, "scheduledArrivalLocalTime": "07:53" },
+    { "id": "lingampally",  "name": "Lingampally",         "latitude": 17.49441, "longitude": 78.31577, "sequenceIndex": 3, "scheduledArrivalLocalTime": "07:59" },
+    { "id": "nallagandla",  "name": "Nallagandla",         "latitude": 17.47307, "longitude": 78.30918, "sequenceIndex": 4, "scheduledArrivalLocalTime": "08:08" },
+    { "id": "gopanpally",   "name": "Gopanpally",          "latitude": 17.43782, "longitude": 78.31659, "sequenceIndex": 5, "scheduledArrivalLocalTime": "08:22" },
+    { "id": "vn_pally",     "name": "V N Pally",           "latitude": 17.41884, "longitude": 78.29243, "sequenceIndex": 6, "scheduledArrivalLocalTime": "08:34" },
+    { "id": "mgit",         "name": "MGIT",                "latitude": 17.39072, "longitude": 78.32239, "sequenceIndex": 7, "scheduledArrivalLocalTime": "08:50" }
+  ],
+
+  "routes": [
+    {
+      "id": "route_9_isnapur",
+      "name": "Route 9 – Isnapur to MGIT",
+      "direction": "to_mgit",
+      "orderedStopIds": ["isnapur", "patancheru", "rc_puram", "lingampally", "nallagandla", "gopanpally", "vn_pally", "mgit"]
+    }
+  ],
+
+  "buses": [
+    {
+      "id": "bus_9",
+      "displayName": "Bus 9 – Isnapur",
+      "routeIds": ["route_9_isnapur"],
+      "trackerReminderTime": "07:15",
+      "serviceDays": [1, 2, 3, 4, 5, 6]
+    }
+  ],
+
+  "operators": [
+    { "busId": "bus_9", "uid": "vBmlPDx8tXR3hvtNgPSJ7DjVIon2" }
+  ]
+}

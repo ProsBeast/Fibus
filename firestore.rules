@@ -1,0 +1,110 @@
+rules_version = '2';
+
+// Fibus Firestore rules (PRD FR-05, FR-06, section 12).
+//
+// - Bus, route, stop, timetable and operator-assignment records are admin-owned:
+//   apps can read them but never write them. Seed them from the console or an
+//   Admin SDK script, which bypasses these rules.
+// - A commuter's profile, home pin and commute preference are readable and
+//   writable only by that commuter.
+// - Alert sessions belong to the commuter who created them.
+// - Anything not matched below is denied.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Fields a client may never set or change on its own profile.
+    function touchesServerOnlyUserFields() {
+      return request.resource.data.diff(resource.data)
+          .affectedKeys().hasAny(['role', 'uid', 'createdAt']);
+    }
+
+    // ---------------------------------------------------------------------
+    // Users and their private commute data
+    // ---------------------------------------------------------------------
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+
+      // New profiles always start as plain commuters; operator/admin roles are
+      // granted server-side only.
+      allow create: if isOwner(uid)
+          && request.resource.data.uid == uid
+          && request.resource.data.role == 'commuter';
+
+      allow update: if isOwner(uid) && !touchesServerOnlyUserFields();
+      allow delete: if false;
+
+      // Home pin and saved commute (personal location data, owner only).
+      match /commutePreferences/{prefId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+            && request.resource.data.userId == uid
+            && request.resource.data.homeLatitude is number
+            && request.resource.data.homeLongitude is number
+            && request.resource.data.homeLatitude >= -90
+            && request.resource.data.homeLatitude <= 90
+            && request.resource.data.homeLongitude >= -180
+            && request.resource.data.homeLongitude <= 180;
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // Admin-configured catalog: readable by any signed-in user
+    // ---------------------------------------------------------------------
+    match /buses/{busId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /routes/{routeId} {
+      allow read: if signedIn();
+      allow write: if false;
+
+      match /stopTimes/{stopId} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+    }
+
+    match /stops/{stopId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /stopTimes/{stopTimeId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // Operators may see only their own assignments.
+    match /operatorAssignments/{assignmentId} {
+      allow read: if signedIn()
+          && resource.data.operatorUid == request.auth.uid;
+      allow write: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // Daily alert sessions (owned by the commuter)
+    // ---------------------------------------------------------------------
+    match /alertSessions/{sessionId} {
+      allow read: if signedIn()
+          && resource.data.commuterUid == request.auth.uid;
+
+      allow create: if signedIn()
+          && request.resource.data.commuterUid == request.auth.uid;
+
+      allow update: if signedIn()
+          && resource.data.commuterUid == request.auth.uid
+          && request.resource.data.commuterUid == request.auth.uid;
+
+      allow delete: if false;
+    }
+  }
+}

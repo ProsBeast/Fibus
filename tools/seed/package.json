@@ -1,0 +1,13 @@
+{
+  "name": "fibus-seed",
+  "private": true,
+  "description": "Admin seed script for the Fibus pilot bus, route, stops and operator assignments.",
+  "type": "module",
+  "scripts": {
+    "seed": "node seed.mjs",
+    "seed:dry": "node seed.mjs --dry-run"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}
