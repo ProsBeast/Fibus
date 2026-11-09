@@ -1,193 +1,95 @@
 import 'package:flutter/material.dart';
-import 'package:fibus/core/theme/app_colors.dart';
+import 'package:fibus/core/theme/fibus_palette.dart';
 
-/// A versatile, dark-themed error display widget.
-///
-/// Can be displayed full-screen or embedded as a compact card inside a list/panel.
+/// An error message with an optional retry, full-page or as a compact card.
 class ErrorDisplay extends StatelessWidget {
-  /// Primary error message.
-  final String message;
-
-  /// Optional heading title (defaults to "Something went wrong").
-  final String? title;
-
-  /// Optional icon (defaults to `Icons.error_outline_rounded`).
-  final IconData? icon;
-
-  /// Callback when user taps the retry button. If null, no retry button is shown.
-  final VoidCallback? onRetry;
-
-  /// Label for the primary retry button (defaults to "Try Again").
-  final String retryLabel;
-
-  /// Optional secondary action callback (e.g. "Go Back" or "Contact Support").
-  final VoidCallback? onSecondaryAction;
-
-  /// Label for secondary action button.
-  final String? secondaryActionLabel;
-
-  /// Whether to render in compact card style instead of centered full-page.
-  final bool compact;
-
   const ErrorDisplay({
     super.key,
     required this.message,
     this.title,
     this.icon,
     this.onRetry,
-    this.retryLabel = 'Try Again',
+    this.retryLabel = 'Try again',
     this.onSecondaryAction,
     this.secondaryActionLabel,
     this.compact = false,
   });
 
+  final String message;
+  final String? title;
+  final IconData? icon;
+  final VoidCallback? onRetry;
+  final String retryLabel;
+  final VoidCallback? onSecondaryAction;
+  final String? secondaryActionLabel;
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
+    final c = context.fib;
+    final t = context.type;
+
     if (compact) {
-      return _buildCompactCard(context);
-    }
-    return _buildFullScreen(context);
-  }
-
-  Widget _buildCompactCard(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.error.withAlpha(80), width: 1),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.error.withAlpha(35),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon ?? Icons.error_outline_rounded,
-              color: AppColors.error,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (title != null && title!.isNotEmpty)
-                  Text(
-                    title!,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+      return Container(
+        padding: const EdgeInsets.all(FibusSpace.s16),
+        decoration: BoxDecoration(
+          color: c.negativeSoft,
+          borderRadius: BorderRadius.circular(FibusSpace.radiusCard),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon ?? Icons.error_outline, size: 18, color: c.negative),
+            const SizedBox(width: FibusSpace.s12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (title != null) Text(title!, style: t.titleSmall),
+                  Text(message, style: t.bodySmall),
+                  if (onRetry != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: FibusSpace.s8),
+                      child: TextButton(
+                        onPressed: onRetry,
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(0, 32),
+                        ),
+                        child: Text(retryLabel),
+                      ),
                     ),
-                  ),
-                const SizedBox(height: 2),
-                Text(
-                  message,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                    height: 1.3,
-                  ),
-                ),
-                if (onRetry != null) ...[
-                  const SizedBox(height: 8),
-                  TextButton.icon(
-                    onPressed: onRetry,
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      foregroundColor: AppColors.primaryBlueLight,
-                    ),
-                    icon: const Icon(Icons.refresh_rounded, size: 16),
-                    label: Text(
-                      retryLabel,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                    ),
-                  ),
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
+          ],
+        ),
+      );
+    }
 
-  Widget _buildFullScreen(BuildContext context) {
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+        padding: const EdgeInsets.all(FibusSpace.s32),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Icon container with soft glow
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: AppColors.error.withAlpha(25),
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.error.withAlpha(80), width: 1.5),
-              ),
-              child: Icon(
-                icon ?? Icons.error_outline_rounded,
-                size: 38,
-                color: AppColors.error,
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Title
-            Text(
-              title ?? 'Something Went Wrong',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.2,
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // Message
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 14,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Action Buttons
-            if (onRetry != null)
-              ElevatedButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: Text(retryLabel),
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(160, 48),
-                ),
-              ),
-
+            Icon(icon ?? Icons.error_outline, size: 28, color: c.textMuted),
+            const SizedBox(height: FibusSpace.s16),
+            Text(title ?? 'Something went wrong',
+                style: t.titleMedium, textAlign: TextAlign.center),
+            const SizedBox(height: FibusSpace.s8),
+            Text(message,
+                style: t.bodyMedium?.copyWith(color: c.textSecondary),
+                textAlign: TextAlign.center),
+            if (onRetry != null) ...[
+              const SizedBox(height: FibusSpace.s24),
+              OutlinedButton(onPressed: onRetry, child: Text(retryLabel)),
+            ],
             if (onSecondaryAction != null && secondaryActionLabel != null) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: FibusSpace.s8),
               TextButton(
-                onPressed: onSecondaryAction,
-                child: Text(secondaryActionLabel!),
-              ),
+                  onPressed: onSecondaryAction,
+                  child: Text(secondaryActionLabel!)),
             ],
           ],
         ),

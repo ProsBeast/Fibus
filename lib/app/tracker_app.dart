@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:fibus/core/theme/tracker_theme.dart';
+import 'package:fibus/core/theme/fibus_theme.dart';
 import 'package:fibus/services/auth_service.dart';
 import 'package:fibus/tracker/providers/tracking_provider.dart';
 import 'package:fibus/tracker/providers/trip_lifecycle_provider.dart';
@@ -14,7 +14,7 @@ import 'package:fibus/tracker/screens/trip_preview_screen.dart';
 /// Root widget for the Fibus Tracker (Operator) application.
 ///
 /// Configures dependency injection via [MultiProvider], sets up declarative
-/// routing via [GoRouter] with authentication guards, and applies [TrackerTheme.darkTheme].
+/// routing via [GoRouter] with authentication guards, and applies [FibusTheme].
 class TrackerApp extends StatefulWidget {
   const TrackerApp({super.key});
 
@@ -112,7 +112,9 @@ class _TrackerAppState extends State<TrackerApp> {
       child: MaterialApp.router(
         title: 'Fibus Tracker',
         debugShowCheckedModeBanner: false,
-        theme: TrackerTheme.darkTheme,
+        theme: FibusTheme.light,
+        darkTheme: FibusTheme.dark,
+        themeMode: ThemeMode.system,
         routerConfig: _router,
       ),
     );

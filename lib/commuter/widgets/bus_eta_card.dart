@@ -1,8 +1,9 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:fibus/core/theme/app_colors.dart';
-import 'package:fibus/core/widgets/glass_card.dart';
+import 'package:fibus/commuter/widgets/departure_countdown.dart';
+import 'package:fibus/commuter/widgets/route_strip.dart';
+import 'package:fibus/core/theme/fibus_palette.dart';
+import 'package:fibus/core/theme/fibus_theme.dart';
+import 'package:fibus/core/widgets/fib_card.dart';
 import 'package:fibus/core/widgets/status_badge.dart';
 import 'package:fibus/models/bus_model.dart';
 import 'package:fibus/models/live_bus.dart';
@@ -10,8 +11,8 @@ import 'package:fibus/models/route_model.dart';
 import 'package:fibus/models/stop_model.dart';
 import 'package:fibus/services/bus_eta_estimator.dart';
 
-/// Glassmorphism card displaying real-time or scheduled bus arrival telemetry,
-/// countdown, health status badge, and stop details.
+/// Where the bus is and when it reaches your stop, with the route strip
+/// and an honest line about where the time comes from (FR-19, FR-27).
 class BusEtaCard extends StatelessWidget {
   const BusEtaCard({
     super.key,
@@ -22,6 +23,9 @@ class BusEtaCard extends StatelessWidget {
     this.busEta,
     this.etaStatus = LiveEtaStatus.noTracker,
     this.delayMinutes = 0,
+    this.stopNames = const [],
+    this.stopFractions = const [],
+    this.busFraction,
   });
 
   final BusModel? bus;
@@ -29,12 +33,13 @@ class BusEtaCard extends StatelessWidget {
   final StopModel? stop;
   final LiveBus? liveBus;
   final DateTime? busEta;
-
-  /// Quality of the live ETA (live, warming up, stale, off route, ...).
   final LiveEtaStatus etaStatus;
 
   /// Live ETA minus timetable at the stop, in minutes (positive = late).
   final int delayMinutes;
+  final List<String> stopNames;
+  final List<double> stopFractions;
+  final double? busFraction;
 
   TrackingStatus get _trackingStatus {
     switch (etaStatus) {
@@ -42,274 +47,119 @@ class BusEtaCard extends StatelessWidget {
         return TrackingStatus.live;
       case LiveEtaStatus.stale:
         return TrackingStatus.stale;
+      case LiveEtaStatus.noTracker:
+        return TrackingStatus.offline;
       default:
         return TrackingStatus.scheduled;
     }
   }
 
-  String _formatEtaCountdown() {
-    if (busEta == null) return '--:--';
-    final difference = busEta!.difference(DateTime.now());
-
-    if (difference.isNegative) {
-      return 'Arrived';
-    }
-
-    final totalMinutes = difference.inMinutes;
-    final remainingSeconds = difference.inSeconds % 60;
-
-    if (totalMinutes >= 60) {
-      final hours = totalMinutes ~/ 60;
-      final mins = totalMinutes % 60;
-      return '${hours}h ${mins}m';
-    }
-
-    return '${totalMinutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
-  }
-
-  String _formatLastUpdated() {
+  String _source() {
     final age = liveBus?.ageSinceLastUpdate;
     switch (etaStatus) {
       case LiveEtaStatus.live:
-        return age == null ? 'Live' : 'Live · ${age.inSeconds}s ago';
+        return age == null ? 'From live GPS' : 'From live GPS, ${age.inSeconds} s ago';
       case LiveEtaStatus.warmingUp:
-        return 'Live warming up · timetable';
+        return 'Tracking just started. Using the timetable for now';
       case LiveEtaStatus.stale:
         return age == null
-            ? 'GPS lost · timetable'
-            : 'GPS lost ${age.inMinutes}m ago · timetable';
+            ? 'GPS lost. Using the timetable'
+            : 'GPS lost ${age.inMinutes} min ago. Using the timetable';
       case LiveEtaStatus.offRoute:
-        return 'Bus off route · timetable';
+        return 'The bus is off its usual road. Using the timetable';
       case LiveEtaStatus.passedStop:
-        return 'Bus has passed your stop';
+        return 'The bus has passed your stop';
       case LiveEtaStatus.noTracker:
-        return 'Not tracking yet · timetable';
+        return 'Tracking has not started. Using the timetable';
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final busTitle = bus?.displayName.isNotEmpty == true
-        ? bus!.displayName
-        : 'Assigned Bus';
+    final c = context.fib;
+    final t = context.type;
+    final stopName = stop?.name.isNotEmpty == true ? stop!.name : 'your stop';
+    final eta = busEta == null ? null : splitTime(busEta!);
+    final until = busEta?.difference(DateTime.now());
+    final boardingIndex =
+        stop == null ? -1 : stopNames.indexWhere((n) => n == stop!.name);
 
-    final routeTitle = route?.name.isNotEmpty == true
-        ? route!.name
-        : 'Campus Route';
+    String? drift;
+    if (etaStatus == LiveEtaStatus.live) {
+      if (delayMinutes >= 5) drift = 'Running $delayMinutes min late vs timetable';
+      if (delayMinutes <= -3) drift = 'Running ${-delayMinutes} min early vs timetable';
+    }
 
-    final stopTitle = stop?.name.isNotEmpty == true
-        ? stop!.name
-        : 'Boarding Stop';
-
-    final etaTimeString = busEta != null
-        ? DateFormat('hh:mm a').format(busEta!)
-        : (stop?.scheduledArrivalLocalTime ?? '07:50 AM');
-
-    return GlassCard(
-      borderRadius: 22,
-      padding: const EdgeInsets.all(22),
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          AppColors.surfaceVariant.withValues(alpha: 0.85),
-          AppColors.surface.withValues(alpha: 0.70),
-        ],
-      ),
+    return FibCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Bus Name, Route & Status Badge
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  bus?.displayName.isNotEmpty == true ? bus!.displayName : 'Your bus',
+                  style: t.titleSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: FibusSpace.s12),
+              StatusBadge(status: _trackingStatus),
+            ],
+          ),
+          const SizedBox(height: FibusSpace.s16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text('Reaches $stopName', style: t.labelMedium),
+                    const SizedBox(height: FibusSpace.s4),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
                       children: [
-                        const Icon(
-                          Icons.directions_bus_rounded,
-                          color: AppColors.primaryLight,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            busTitle,
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.3,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
+                        Text(eta?.clock ?? '--:--',
+                            style: FibusType.figure(context,
+                                size: 28, weight: FontWeight.w500)),
+                        if (eta != null) ...[
+                          const SizedBox(width: FibusSpace.s4),
+                          Text(eta.meridiem,
+                              style: FibusType.figure(context,
+                                  size: 14, color: c.textSecondary)),
+                        ],
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      routeTitle,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              StatusBadge(status: _trackingStatus),
+              if (until != null)
+                Text(
+                  until.isNegative ? 'Due now' : 'in ${formatDuration(until)}',
+                  style: t.bodySmall,
+                ),
             ],
           ),
-
-          const SizedBox(height: 20),
-
-          // Main Center Stage: ETA Countdown & Target Arrival
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: AppColors.background.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppColors.glassBorder.withValues(alpha: 0.4),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'ESTIMATED ARRIVAL',
-                      style: TextStyle(
-                        color: AppColors.textTertiary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      transitionBuilder: (child, animation) =>
-                          FadeTransition(opacity: animation, child: child),
-                      child: Text(
-                        _formatEtaCountdown(),
-                        key: ValueKey(_formatEtaCountdown()),
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 32,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5,
-                          fontFeatures: [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text(
-                      'ETA AT STOP',
-                      style: TextStyle(
-                        color: AppColors.textTertiary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      etaTimeString,
-                      style: const TextStyle(
-                        color: AppColors.accent,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Subtitle / Location & Refresh indicator
-          Row(
-            children: [
-              const Icon(
-                Icons.location_on_outlined,
-                color: AppColors.primaryLight,
-                size: 16,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Arriving at $stopTitle',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Text(
-                _formatLastUpdated(),
-                style: const TextStyle(
-                  color: AppColors.textTertiary,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-
-          // Significant delay notification bar if delayed >= 5 min
-          if (etaStatus == LiveEtaStatus.live && delayMinutes >= 5) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.warning.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: AppColors.warning.withValues(alpha: 0.4),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.warning_amber_rounded,
-                    color: AppColors.warning,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Bus running $delayMinutes min late. Departure updated.',
-                      style: const TextStyle(
-                        color: AppColors.warning,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          if (boardingIndex >= 0 && stopFractions.length == stopNames.length) ...[
+            const SizedBox(height: FibusSpace.s16),
+            RouteStrip(
+              stopNames: stopNames,
+              stopFractions: stopFractions,
+              boardingIndex: boardingIndex,
+              busFraction: busFraction,
+              busIsLive: etaStatus == LiveEtaStatus.live,
             ),
           ],
+          const SizedBox(height: FibusSpace.s12),
+          if (drift != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: FibusSpace.s4),
+              child: Text(drift, style: t.bodySmall?.copyWith(color: c.accentInk)),
+            ),
+          Text(_source(), style: t.labelSmall),
         ],
       ),
     );

@@ -53,6 +53,19 @@ class CommuteProvider extends ChangeNotifier {
   DepartureRecommendation? get departureRecommendation => _departureRecommendation;
   List<StopModel> get routeStops => _routeStops;
 
+  /// Stop positions along the route (0..1), for the route strip.
+  List<double> get stopFractions => _etaEstimator?.stopFractions ?? const [];
+
+  /// The bus's last accepted position along the route (0..1), or null when
+  /// there is no tracker data for this trip.
+  double? get busFraction {
+    final e = _etaEstimator;
+    final along = e?.latestProgressMeters;
+    if (e == null || along == null || e.routeLengthMeters <= 0) return null;
+    if (_etaEstimate.status == LiveEtaStatus.noTracker) return null;
+    return (along / e.routeLengthMeters).clamp(0.0, 1.0);
+  }
+
   /// Live ETA quality and prediction for the boarding stop.
   BusEtaEstimate get etaEstimate => _etaEstimate;
   bool get isLoading => _isLoading;

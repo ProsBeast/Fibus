@@ -125,6 +125,15 @@ class BusEtaEstimator {
 
   double get routeLengthMeters => _cumulative.last;
 
+  /// Progress (metres along the route) of the latest accepted fix.
+  double? get latestProgressMeters => _fixes.isEmpty ? null : _fixes.last.along;
+
+  /// Each stop's position along the route as a 0..1 fraction, in stop order.
+  List<double> get stopFractions => [
+        for (final a in _stopAlong)
+          routeLengthMeters <= 0 ? 0.0 : (a / routeLengthMeters).clamp(0.0, 1.0),
+      ];
+
   /// Progress (metres along the route) of the stop with [stopId].
   double? stopProgress(String stopId) {
     final i = _stops.indexWhere((s) => s.id == stopId);

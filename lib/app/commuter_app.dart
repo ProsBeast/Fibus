@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:fibus/core/theme/commuter_theme.dart';
+import 'package:fibus/core/theme/fibus_theme.dart';
 import 'package:fibus/commuter/providers/alert_session_provider.dart';
 import 'package:fibus/commuter/providers/commute_provider.dart';
 import 'package:fibus/commuter/screens/choose_commute_screen.dart';
@@ -92,7 +92,9 @@ class _CommuterAppState extends State<CommuterApp> {
       child: MaterialApp.router(
         title: 'Fibus Commuter',
         debugShowCheckedModeBanner: false,
-        theme: CommuterTheme.darkTheme,
+        theme: FibusTheme.light,
+        darkTheme: FibusTheme.dark,
+        themeMode: ThemeMode.system,
         routerConfig: _router,
       ),
     );

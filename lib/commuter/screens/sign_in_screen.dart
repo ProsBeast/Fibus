@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:fibus/core/theme/app_colors.dart';
-import 'package:fibus/core/widgets/glass_card.dart';
-import 'package:fibus/services/auth_service.dart';
 import 'package:fibus/commuter/providers/commute_provider.dart';
+import 'package:fibus/commuter/widgets/route_strip.dart';
+import 'package:fibus/core/theme/fibus_palette.dart';
+import 'package:fibus/core/theme/fibus_theme.dart';
+import 'package:fibus/core/widgets/fib_card.dart';
+import 'package:fibus/core/widgets/fibus_wordmark.dart';
+import 'package:fibus/services/auth_service.dart';
 
-/// Commuter Sign-In screen with Google authentication and branding.
+/// Commuter sign-in: says what Fibus does, shows a preview of the answer it
+/// gives, and offers one action.
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
 
@@ -19,321 +23,139 @@ class _SignInScreenState extends State<SignInScreen> {
 
   Future<void> _handleGoogleSignIn() async {
     setState(() => _isSigningIn = true);
-
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final authService = context.read<AuthService>();
       final credential = await authService.signInWithGoogle();
+      if (credential == null || !mounted) return;
 
-      if (credential != null && mounted) {
-        final commuteProvider = context.read<CommuteProvider>();
-        await commuteProvider.initForUser(credential.uid);
+      final commuteProvider = context.read<CommuteProvider>();
+      await commuteProvider.initForUser(credential.uid);
+      if (!mounted) return;
 
-        if (!mounted) return;
-
-        // Check if home pin is configured
-        if (commuteProvider.hasHomePin) {
-          if (commuteProvider.isCommuteSelected) {
-            context.go('/dashboard');
-          } else {
-            context.go('/choose-commute');
-          }
-        } else {
-          context.go('/home-pin');
-        }
+      if (!commuteProvider.hasHomePin) {
+        context.go('/home-pin');
+      } else if (!commuteProvider.isCommuteSelected) {
+        context.go('/choose-commute');
+      } else {
+        context.go('/dashboard');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline_rounded, color: AppColors.error),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text('Sign-in failed: ${e.toString()}'),
-                ),
-              ],
-            ),
-            backgroundColor: AppColors.surfaceElevated,
-          ),
-        );
-      }
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not sign in. ${_short(e)}')),
+      );
     } finally {
-      if (mounted) {
-        setState(() => _isSigningIn = false);
-      }
+      if (mounted) setState(() => _isSigningIn = false);
     }
+  }
+
+  String _short(Object e) {
+    final s = e.toString();
+    return s.length > 80 ? '${s.substring(0, 80)}…' : s;
   }
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
+    final c = context.fib;
+    final t = context.type;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          // Background ambient gradient circles
-          Positioned(
-            top: -size.width * 0.3,
-            left: -size.width * 0.2,
-            child: Container(
-              width: size.width * 1.2,
-              height: size.width * 1.2,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.primary.withValues(alpha: 0.18),
-                    Colors.transparent,
-                  ],
-                ),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, box) => SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+                FibusSpace.page, FibusSpace.s24, FibusSpace.page, FibusSpace.s24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: box.maxHeight - 48),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const FibusWordmark(),
+                  const SizedBox(height: FibusSpace.s48),
+                  Text('Leave home just in time for your bus',
+                      style: t.headlineMedium),
+                  const SizedBox(height: FibusSpace.s12),
+                  Text(
+                    'Fibus follows the bus on its route and your ride to the '
+                    'stop, then tells you when to go',
+                    style: t.bodyLarge?.copyWith(color: c.textSecondary),
+                  ),
+                  const SizedBox(height: FibusSpace.s32),
+                  const _AnswerPreview(),
+                  const SizedBox(height: FibusSpace.s40),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _isSigningIn ? null : _handleGoogleSignIn,
+                      child: _isSigningIn
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: c.textMuted),
+                            )
+                          : const Text('Continue with Google'),
+                    ),
+                  ),
+                  const SizedBox(height: FibusSpace.s16),
+                  Text(
+                    'Your home pin stays private and is only used to time your trip',
+                    style: t.bodySmall?.copyWith(color: c.textMuted),
+                  ),
+                ],
               ),
             ),
           ),
-          Positioned(
-            bottom: -size.width * 0.2,
-            right: -size.width * 0.2,
-            child: Container(
-              width: size.width,
-              height: size.width,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.accent.withValues(alpha: 0.12),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Fibus Icon Logo with Neon Glow
-                    Container(
-                      padding: const EdgeInsets.all(22),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.surfaceVariant,
-                        border: Border.all(
-                          color: AppColors.primaryLight.withValues(alpha: 0.3),
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.4),
-                            blurRadius: 32,
-                            spreadRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.directions_bus_filled_rounded,
-                        size: 56,
-                        color: AppColors.primaryLight,
-                      ),
-                    ),
-
-                    const SizedBox(height: 28),
-
-                    // App Title
-                    RichText(
-                      text: const TextSpan(
-                        children: [
-                          TextSpan(
-                            text: 'Fi',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 40,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -1,
-                            ),
-                          ),
-                          TextSpan(
-                            text: 'bus',
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontSize: 40,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -1,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // Tagline
-                    const Text(
-                      'Know when to leave home',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-
-                    const SizedBox(height: 48),
-
-                    // Feature highlights glass card
-                    GlassCard(
-                      borderRadius: 20,
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        children: [
-                          _buildFeatureRow(
-                            icon: Icons.electric_scooter_rounded,
-                            title: 'Traffic-aware departure time',
-                            subtitle:
-                                'Calculates your scooter travel to arrive 5 min before bus',
-                          ),
-                          const SizedBox(height: 16),
-                          const Divider(color: AppColors.divider),
-                          const SizedBox(height: 16),
-                          _buildFeatureRow(
-                            icon: Icons.satellite_alt_rounded,
-                            title: 'Live GPS Telemetry',
-                            subtitle:
-                                'Real-time countdown with automatic delay updates',
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 40),
-
-                    // Google Sign-In Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        onPressed: _isSigningIn ? null : _handleGoogleSignIn,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black87,
-                          elevation: 3,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: _isSigningIn
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    AppColors.primary,
-                                  ),
-                                ),
-                              )
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  // Google "G" icon style
-                                  Container(
-                                    width: 22,
-                                    height: 22,
-                                    decoration: const BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Colors.white,
-                                    ),
-                                    child: const Center(
-                                      child: Text(
-                                        'G',
-                                        style: TextStyle(
-                                          color: Color(0xFF4285F4),
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  const Text(
-                                    'Continue with Google',
-                                    style: TextStyle(
-                                      color: Colors.black87,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.1,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Privacy notice
-                    const Text(
-                      'Your location data is private and only used for departure estimation.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: AppColors.textTertiary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
+}
 
-  Widget _buildFeatureRow({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-  }) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: AppColors.primaryLight, size: 20),
+/// A sample of the dashboard answer, so the first screen shows the product.
+class _AnswerPreview extends StatelessWidget {
+  const _AnswerPreview();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.fib;
+    final t = context.type;
+    return ExcludeSemantics(
+      child: FibCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Leave by', style: t.labelMedium),
+            const SizedBox(height: FibusSpace.s4),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                const ClockFigure('7:41', size: 44),
+                const SizedBox(width: FibusSpace.s8),
+                Text('am',
+                    style: FibusType.figure(context, size: 16, color: c.textSecondary)),
+              ],
+            ),
+            const SizedBox(height: FibusSpace.s8),
+            Text('Bus 9 reaches Lingampally at 7:59 am, 12 min by scooter',
+                style: t.bodySmall),
+            const SizedBox(height: FibusSpace.s16),
+            Divider(color: c.hairline),
+            const SizedBox(height: FibusSpace.s12),
+            const RouteStrip(
+              stopNames: [
+                'Isnapur', 'Patancheru', 'R C Puram', 'Lingampally',
+                'Nallagandla', 'Gopanpally', 'V N Pally', 'MGIT',
+              ],
+              stopFractions: [0, 0.17, 0.32, 0.41, 0.5, 0.63, 0.79, 1],
+              boardingIndex: 3,
+              busFraction: 0.12,
+              busIsLive: true,
+            ),
+          ],
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

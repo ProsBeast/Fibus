@@ -1,247 +1,112 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:fibus/core/theme/app_colors.dart';
+import 'package:fibus/core/theme/fibus_palette.dart';
+import 'package:fibus/core/theme/fibus_theme.dart';
 
-/// A compact, high-visibility GPS health telemetry bar for bus operators.
-///
-/// Displays real-time signal strength bars, horizontal accuracy in meters with
-/// color-coded health tiers, fix frequency counter, and dynamic fix age counter.
+/// GPS quality in plain words with the three numbers behind it:
+/// accuracy, time since the last fix and how many fixes were sent.
 class GpsHealthIndicator extends StatefulWidget {
-  /// Horizontal accuracy in meters (lower is better).
-  final double accuracy;
-
-  /// Total count of valid GPS fixes received in this tracking session.
-  final int fixCount;
-
-  /// Timestamp of the latest GPS fix, or null if no fix yet received.
-  final DateTime? lastFixTime;
-
-  /// Whether active GPS sampling is in progress.
-  final bool isTracking;
-
   const GpsHealthIndicator({
     super.key,
     required this.accuracy,
     required this.fixCount,
-    this.lastFixTime,
-    this.isTracking = true,
+    required this.lastFixTime,
+    required this.isTracking,
   });
+
+  /// Horizontal accuracy in metres of the latest fix.
+  final double accuracy;
+  final int fixCount;
+  final DateTime? lastFixTime;
+  final bool isTracking;
 
   @override
   State<GpsHealthIndicator> createState() => _GpsHealthIndicatorState();
 }
 
 class _GpsHealthIndicatorState extends State<GpsHealthIndicator> {
-  Timer? _tickerTimer;
+  Timer? _ticker;
 
   @override
   void initState() {
     super.initState();
-    // 1-second refresh for the fix age timer
-    _tickerTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && widget.lastFixTime != null) {
-        setState(() {});
-      }
+    // Refresh "last fix" age once a second.
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
     });
   }
 
   @override
   void dispose() {
-    _tickerTimer?.cancel();
+    _ticker?.cancel();
     super.dispose();
   }
 
-  Color _getAccuracyColor(double acc) {
-    if (!widget.isTracking || widget.lastFixTime == null) {
-      return AppColors.textMuted;
-    }
-    if (acc <= 10.0) return AppColors.success;
-    if (acc <= 30.0) return AppColors.warning;
-    return AppColors.error;
-  }
-
-  int _getSignalBars(double acc) {
-    if (!widget.isTracking || widget.lastFixTime == null) return 0;
-    if (acc <= 8.0) return 4;
-    if (acc <= 20.0) return 3;
-    if (acc <= 50.0) return 2;
-    return 1;
-  }
-
-  String _formatFixAge() {
-    if (!widget.isTracking || widget.lastFixTime == null) {
-      return 'Waiting for GPS';
-    }
-    final seconds = DateTime.now().difference(widget.lastFixTime!).inSeconds;
-    if (seconds < 2) return 'Just now';
-    if (seconds < 60) return '${seconds}s ago';
-    final minutes = seconds ~/ 60;
-    return '${minutes}m ago';
+  String _quality(int? age) {
+    if (!widget.isTracking || widget.lastFixTime == null) return 'No GPS yet';
+    if (age != null && age >= 60) return 'GPS lost';
+    if (widget.accuracy <= 20) return 'GPS good';
+    if (widget.accuracy <= 50) return 'GPS fair';
+    return 'GPS weak, move near a window';
   }
 
   @override
   Widget build(BuildContext context) {
-    final accColor = _getAccuracyColor(widget.accuracy);
-    final signalBars = _getSignalBars(widget.accuracy);
-    final fixAgeText = _formatFixAge();
+    final c = context.fib;
+    final age = widget.lastFixTime == null
+        ? null
+        : DateTime.now().difference(widget.lastFixTime!).inSeconds;
+    final bad = age == null || age >= 60 || widget.accuracy > 50;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.all(FibusSpace.s16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: widget.isTracking
-              ? accColor.withValues(alpha: 0.35)
-              : AppColors.border,
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: widget.isTracking
-                ? accColor.withValues(alpha: 0.12)
-                : Colors.black26,
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: c.surface,
+        borderRadius: BorderRadius.circular(FibusSpace.radiusCard),
+        border: Border.all(color: c.hairline),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Signal strength icon with tiered bars
+          Text(_quality(age),
+              style: context.type.titleSmall
+                  ?.copyWith(color: bad && widget.isTracking ? c.accentInk : null)),
+          const SizedBox(height: FibusSpace.s12),
           Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              _buildSignalBarsWidget(signalBars, accColor),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'GPS SIGNAL',
-                    style: TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                  Text(
-                    widget.isTracking && widget.lastFixTime != null
-                        ? '±${widget.accuracy.toStringAsFixed(1)} m'
-                        : 'NO FIX',
-                    style: TextStyle(
-                      color: accColor,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+              Expanded(
+                child: _Meta(
+                    label: 'Accuracy',
+                    value: widget.lastFixTime == null
+                        ? '--'
+                        : '±${widget.accuracy.toStringAsFixed(0)} m'),
               ),
-            ],
-          ),
-
-          // Divider
-          Container(
-            height: 24,
-            width: 1,
-            color: AppColors.border,
-          ),
-
-          // 2. Last fix age
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'LAST FIX',
-                style: TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                ),
+              Expanded(
+                child: _Meta(label: 'Last fix', value: age == null ? '--' : '$age s ago'),
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: accColor,
-                    ),
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    fixAgeText,
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          // Divider
-          Container(
-            height: 24,
-            width: 1,
-            color: AppColors.border,
-          ),
-
-          // 3. Total Fix Count
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'FIX COUNT',
-                style: TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              Text(
-                '${widget.fixCount}',
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-              ),
+              Expanded(child: _Meta(label: 'Sent', value: '${widget.fixCount}')),
             ],
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildSignalBarsWidget(int activeBars, Color activeColor) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: List.generate(4, (index) {
-        final barHeight = 6.0 + (index * 4.0);
-        final isActive = index < activeBars;
-        return Container(
-          width: 3.5,
-          height: barHeight,
-          margin: const EdgeInsets.symmetric(horizontal: 1.2),
-          decoration: BoxDecoration(
-            color: isActive ? activeColor : AppColors.surfaceHighlight,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        );
-      }),
+class _Meta extends StatelessWidget {
+  const _Meta({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: context.type.labelSmall),
+        const SizedBox(height: FibusSpace.s4),
+        Text(value, style: FibusType.figure(context, size: 14)),
+      ],
     );
   }
 }

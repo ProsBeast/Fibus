@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:fibus/core/theme/app_colors.dart';
-import 'package:fibus/core/widgets/glass_card.dart';
+import 'package:fibus/commuter/providers/commute_provider.dart';
+import 'package:fibus/core/constants/app_constants.dart';
+import 'package:fibus/core/theme/fibus_palette.dart';
+import 'package:fibus/core/theme/fibus_theme.dart';
+import 'package:fibus/core/widgets/fib_card.dart';
 import 'package:fibus/services/auth_service.dart';
 import 'package:fibus/services/notification_service.dart';
-import 'package:fibus/commuter/providers/commute_provider.dart';
 
-/// Settings screen for commuter preferences, alert lead times, notifications,
-/// profile, and sign-out.
+/// Account, commute, alert timing and notification permission.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -19,6 +20,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final NotificationService _notificationService = NotificationService.instance;
   bool _notificationsEnabled = true;
+  double? _draftLead;
 
   @override
   void initState() {
@@ -28,338 +30,232 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _checkNotificationPermission() async {
     final enabled = await _notificationService.areNotificationsEnabled();
-    if (mounted) {
-      setState(() => _notificationsEnabled = enabled);
-    }
+    if (mounted) setState(() => _notificationsEnabled = enabled);
+  }
+
+  Future<void> _requestNotifications() async {
+    final granted = await _notificationService.requestPermission();
+    if (mounted) setState(() => _notificationsEnabled = granted);
   }
 
   Future<void> _handleSignOut() async {
+    final c = context.fib;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surfaceElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text(
-          'Sign Out',
-          style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700),
-        ),
-        content: const Text(
-          'Are you sure you want to sign out of Fibus Commuter?',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
+        title: const Text('Sign out of Fibus'),
+        content: const Text('Today\'s alerts stop until you sign in again'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textTertiary)),
+            child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Sign Out'),
+            style: TextButton.styleFrom(foregroundColor: c.negative),
+            child: const Text('Sign out'),
           ),
         ],
       ),
     );
-
-    if (confirm == true && mounted) {
-      await context.read<AuthService>().signOut();
-      if (mounted) {
-        context.go('/sign-in');
-      }
-    }
+    if (confirm != true || !mounted) return;
+    await context.read<AuthService>().signOut();
+    if (mounted) context.go('/sign-in');
   }
 
   @override
   Widget build(BuildContext context) {
-    final authService = context.watch<AuthService>();
-    final commuteProvider = context.watch<CommuteProvider>();
-    final user = authService.currentUser;
-    final pref = commuteProvider.currentPreference;
-
-    final advanceMinutes = pref?.advanceWarningMinutes.toDouble() ?? 15.0;
+    final c = context.fib;
+    final t = context.type;
+    final user = context.watch<AuthService>().currentUser;
+    final commute = context.watch<CommuteProvider>();
+    final pref = commute.currentPreference;
+    final lead = _draftLead ??
+        (pref?.advanceWarningMinutes ?? AppConstants.defaultAdvanceWarningMinutes)
+            .toDouble();
+    final name = user?.displayName?.isNotEmpty == true ? user!.displayName! : 'You';
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
+          tooltip: 'Back',
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // User Profile Card
-              GlassCard(
-                borderRadius: 20,
-                padding: const EdgeInsets.all(18),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundColor: AppColors.primaryContainer,
-                      backgroundImage: user?.photoURL != null
-                          ? NetworkImage(user!.photoURL!)
-                          : null,
-                      child: user?.photoURL == null
-                          ? Text(
-                              (user?.displayName?.isNotEmpty == true
-                                      ? user!.displayName![0]
-                                      : 'U')
-                                  .toUpperCase(),
-                              style: const TextStyle(
-                                color: AppColors.primaryLight,
-                                fontSize: 22,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            )
-                          : null,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            user?.displayName ?? 'Commuter',
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            user?.email ?? '',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 13,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Section 1: Commute Configuration
-              const Text(
-                'COMMUTE CONFIGURATION',
-                style: TextStyle(
-                  color: AppColors.textTertiary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              GlassCard(
-                borderRadius: 18,
-                padding: EdgeInsets.zero,
-                child: Column(
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.home_rounded,
-                          color: AppColors.primaryLight),
-                      title: const Text(
-                        'Home Location Pin',
-                        style: TextStyle(color: AppColors.textPrimary, fontSize: 15),
-                      ),
-                      subtitle: Text(
-                        pref != null && pref.hasHomePin
-                            ? 'Pinned (${pref.homeLatitude.toStringAsFixed(3)}, ${pref.homeLongitude.toStringAsFixed(3)})'
-                            : 'Not set yet',
-                        style: const TextStyle(
-                            color: AppColors.textSecondary, fontSize: 13),
-                      ),
-                      trailing: const Icon(Icons.chevron_right_rounded,
-                          color: AppColors.textTertiary),
-                      onTap: () => context.push('/home-pin'),
-                    ),
-                    const Divider(color: AppColors.divider),
-                    ListTile(
-                      leading: const Icon(Icons.alt_route_rounded,
-                          color: AppColors.accent),
-                      title: const Text(
-                        'Change Route & Bus',
-                        style: TextStyle(color: AppColors.textPrimary, fontSize: 15),
-                      ),
-                      subtitle: Text(
-                        pref != null && pref.routeName.isNotEmpty
-                            ? '${pref.routeName} • ${pref.busName}'
-                            : 'No route selected',
-                        style: const TextStyle(
-                            color: AppColors.textSecondary, fontSize: 13),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: const Icon(Icons.chevron_right_rounded,
-                          color: AppColors.textTertiary),
-                      onTap: () => context.push('/choose-commute'),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Section 2: Alerts & Lead Times
-              const Text(
-                'NOTIFICATIONS & TIMING',
-                style: TextStyle(
-                  color: AppColors.textTertiary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              GlassCard(
-                borderRadius: 18,
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+              FibusSpace.page, FibusSpace.s8, FibusSpace.page, FibusSpace.s32),
+          children: [
+            FibCard(
+              padding: const EdgeInsets.all(FibusSpace.s16),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: c.raised,
+                    foregroundImage:
+                        user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
+                    child: Text(name.characters.first.toUpperCase(),
+                        style: t.titleSmall?.copyWith(color: c.textSecondary)),
+                  ),
+                  const SizedBox(width: FibusSpace.s12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Advance Warning Time',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryContainer,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '${advanceMinutes.round()} min',
-                            style: const TextStyle(
-                              color: AppColors.primaryLight,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
+                        Text(name, style: t.titleSmall),
+                        if (user?.email != null)
+                          Text(user!.email!,
+                              style: t.bodySmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Slider(
-                      value: advanceMinutes,
-                      min: 5,
-                      max: 30,
-                      divisions: 5,
-                      onChanged: (val) {
-                        commuteProvider.updateAdvanceWarningMinutes(val.round());
-                      },
-                    ),
-                    const Divider(color: AppColors.divider),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      secondary: Icon(
-                        _notificationsEnabled
-                            ? Icons.notifications_active_rounded
-                            : Icons.notifications_off_rounded,
-                        color: _notificationsEnabled
-                            ? AppColors.statusLive
-                            : AppColors.textTertiary,
-                      ),
-                      title: const Text(
-                        'Push Notifications',
-                        style: TextStyle(color: AppColors.textPrimary, fontSize: 15),
-                      ),
-                      subtitle: Text(
-                        _notificationsEnabled ? 'Enabled' : 'Disabled (Permission required)',
-                        style: const TextStyle(
-                            color: AppColors.textSecondary, fontSize: 13),
-                      ),
-                      value: _notificationsEnabled,
-                      activeColor: AppColors.primary,
-                      onChanged: (val) async {
-                        if (val) {
-                          final granted =
-                              await _notificationService.requestPermission();
-                          setState(() => _notificationsEnabled = granted);
-                        } else {
-                          setState(() => _notificationsEnabled = false);
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 28),
-
-              // Sign Out Button
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: OutlinedButton.icon(
-                  onPressed: _handleSignOut,
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.error),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
                   ),
-                  icon: const Icon(Icons.logout_rounded, color: AppColors.error),
-                  label: const Text(
-                    'Sign Out',
-                    style: TextStyle(
-                      color: AppColors.error,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: FibusSpace.s24),
+            const SectionLabel('Commute'),
+            const SizedBox(height: FibusSpace.s8),
+            FibCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  _NavRow(
+                    icon: Icons.home_outlined,
+                    title: 'Home',
+                    value: pref != null && pref.hasHomePin ? 'Saved' : 'Not set',
+                    onTap: () => context.push('/home-pin'),
                   ),
-                ),
+                  const Divider(indent: 48),
+                  _NavRow(
+                    icon: Icons.directions_bus_outlined,
+                    title: 'Bus and stop',
+                    value: pref != null && pref.boardingStopName.isNotEmpty
+                        ? pref.boardingStopName
+                        : 'Not set',
+                    onTap: () => context.push('/choose-commute'),
+                  ),
+                ],
               ),
-
-              const SizedBox(height: 28),
-
-              // App Version Footer
-              const Center(
-                child: Column(
-                  children: [
-                    Text(
-                      'Fibus Commuter',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+            ),
+            const SizedBox(height: FibusSpace.s24),
+            const SectionLabel('Alerts'),
+            const SizedBox(height: FibusSpace.s8),
+            FibCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: Text('Heads-up', style: t.bodyMedium)),
+                      Text('${lead.round()} min before',
+                          style: FibusType.figure(context, size: 14)),
+                    ],
+                  ),
+                  Slider(
+                    value: lead,
+                    min: 5,
+                    max: 30,
+                    divisions: 5,
+                    label: '${lead.round()} min',
+                    onChanged: (v) => setState(() => _draftLead = v),
+                    onChangeEnd: (v) {
+                      commute.updateAdvanceWarningMinutes(v.round());
+                      setState(() => _draftLead = null);
+                    },
+                  ),
+                  const Divider(),
+                  const SizedBox(height: FibusSpace.s12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Notifications', style: t.bodyMedium),
+                            Text(
+                              _notificationsEnabled
+                                  ? 'Allowed'
+                                  : 'Blocked, so alerts cannot reach you',
+                              style: t.bodySmall?.copyWith(
+                                  color: _notificationsEnabled ? null : c.negative),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Version 1.0.0 (Build 1) • India Pilot Edition',
-                      style: TextStyle(
-                        color: AppColors.textTertiary,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
+                      if (!_notificationsEnabled)
+                        OutlinedButton(
+                          onPressed: _requestNotifications,
+                          style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 40)),
+                          child: const Text('Allow'),
+                        ),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(height: 20),
+            ),
+            const SizedBox(height: FibusSpace.s32),
+            TextButton(
+              onPressed: _handleSignOut,
+              style: TextButton.styleFrom(
+                foregroundColor: c.negative,
+                minimumSize: const Size.fromHeight(48),
+              ),
+              child: const Text('Sign out'),
+            ),
+            const SizedBox(height: FibusSpace.s16),
+            Center(
+              child: Text('Fibus 1.0.0 · Route 9 pilot',
+                  style: FibusType.figure(context, size: 12, color: c.textMuted)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavRow extends StatelessWidget {
+  const _NavRow({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.fib;
+    return InkWell(
+      onTap: onTap,
+      child: SizedBox(
+        height: 56,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: FibusSpace.s16),
+          child: Row(
+            children: [
+              SizedBox(width: 20, child: Icon(icon, size: 18, color: c.textSecondary)),
+              const SizedBox(width: FibusSpace.s12),
+              Expanded(child: Text(title, style: context.type.bodyMedium)),
+              Flexible(
+                child: Text(value,
+                    style: context.type.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+              ),
+              const SizedBox(width: FibusSpace.s4),
+              Icon(Icons.chevron_right, size: 18, color: c.textMuted),
             ],
           ),
         ),

@@ -4,12 +4,13 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
-import 'package:fibus/core/constants/app_constants.dart';
-import 'package:fibus/core/theme/app_colors.dart';
 import 'package:fibus/commuter/providers/commute_provider.dart';
+import 'package:fibus/core/constants/app_constants.dart';
+import 'package:fibus/core/theme/fibus_palette.dart';
+import 'package:fibus/core/widgets/map_tiles.dart';
 import 'package:fibus/services/geocoding_service.dart';
 
-/// Interactive map screen enabling the commuter to pinpoint and save their home coordinates.
+/// Map screen where the commuter places a pin on their home.
 class HomePinScreen extends StatefulWidget {
   const HomePinScreen({super.key});
 
@@ -26,7 +27,6 @@ class _HomePinScreenState extends State<HomePinScreen> {
   late LatLng _currentCenter;
   bool _isSaving = false;
 
-  /// Search-as-you-type state.
   static const Duration _searchDebounce = Duration(milliseconds: 450);
   static const int _minQueryLength = 3;
   Timer? _debounceTimer;
@@ -39,14 +39,9 @@ class _HomePinScreenState extends State<HomePinScreen> {
   void initState() {
     super.initState();
     final pref = context.read<CommuteProvider>().currentPreference;
-    if (pref != null && pref.hasHomePin) {
-      _currentCenter = pref.homeLocation;
-    } else {
-      _currentCenter = const LatLng(
-        AppConstants.defaultLatitude,
-        AppConstants.defaultLongitude,
-      );
-    }
+    _currentCenter = (pref != null && pref.hasHomePin)
+        ? pref.homeLocation
+        : const LatLng(AppConstants.defaultLatitude, AppConstants.defaultLongitude);
   }
 
   @override
@@ -78,24 +73,22 @@ class _HomePinScreenState extends State<HomePinScreen> {
       _isSearching = true;
       _searchError = null;
     });
-
     try {
       final results = await _geocoder.search(query, near: _currentCenter);
       if (!mounted || seq != _searchSeq) return;
       setState(() {
         _suggestions = results;
-        _searchError = results.isEmpty ? 'No places found for "$query".' : null;
+        _searchError =
+            results.isEmpty ? 'No places found for "$query" in Telangana' : null;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted || seq != _searchSeq) return;
       setState(() {
         _suggestions = const [];
-        _searchError = 'Search failed. Check your connection and try again.';
+        _searchError = 'Search is not reachable. Check your connection';
       });
     } finally {
-      if (mounted && seq == _searchSeq) {
-        setState(() => _isSearching = false);
-      }
+      if (mounted && seq == _searchSeq) setState(() => _isSearching = false);
     }
   }
 
@@ -124,61 +117,72 @@ class _HomePinScreenState extends State<HomePinScreen> {
     });
   }
 
-  Widget _buildSearchResults() {
-    final hasContent = _suggestions.isNotEmpty || _searchError != null;
-    if (!hasContent) return const SizedBox.shrink();
+  Future<void> _confirmHomeLocation() async {
+    setState(() => _isSaving = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final commuteProvider = context.read<CommuteProvider>();
+      await commuteProvider.updateHomeLocation(
+        _currentCenter.latitude,
+        _currentCenter.longitude,
+      );
+      if (!mounted) return;
+      messenger.showSnackBar(const SnackBar(content: Text('Home saved')));
+      context.go(
+          commuteProvider.isCommuteSelected ? '/dashboard' : '/choose-commute');
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not save your home. Try again')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
 
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      constraints: const BoxConstraints(maxHeight: 300),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.97),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.glassBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 14,
-          ),
+  /// A surface floating over the map: neutral with a soft, small shadow.
+  BoxDecoration _floating(FibusPalette c) => BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(FibusSpace.radiusCard),
+        border: Border.all(color: c.hairline),
+        boxShadow: const [
+          BoxShadow(color: Color(0x14000000), blurRadius: 24, offset: Offset(0, 8)),
         ],
-      ),
+      );
+
+  Widget _buildSearchResults(FibusPalette c) {
+    if (_suggestions.isEmpty && _searchError == null) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      margin: const EdgeInsets.only(top: FibusSpace.s8),
+      constraints: const BoxConstraints(maxHeight: 304),
+      decoration: _floating(c),
       child: _searchError != null
           ? Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                _searchError!,
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-              ),
+              padding: const EdgeInsets.all(FibusSpace.s16),
+              child: Text(_searchError!, style: context.type.bodySmall),
             )
           : ListView.separated(
               shrinkWrap: true,
-              padding: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.symmetric(vertical: FibusSpace.s4),
               itemCount: _suggestions.length,
-              separatorBuilder: (_, _) => Divider(
-                height: 1,
-                color: AppColors.glassBorder.withValues(alpha: 0.5),
-              ),
+              separatorBuilder: (_, _) => const Divider(indent: 48, endIndent: 16),
               itemBuilder: (context, index) {
                 final place = _suggestions[index];
                 return ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.place_rounded,
-                      color: AppColors.primaryLight, size: 20),
-                  title: Text(
-                    place.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
-                  ),
+                  minLeadingWidth: 20,
+                  horizontalTitleGap: FibusSpace.s12,
+                  leading: Icon(Icons.place_outlined, size: 18, color: c.textMuted),
+                  title: Text(place.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.type.bodyMedium),
                   subtitle: place.subtitle.isEmpty
                       ? null
-                      : Text(
-                          place.subtitle,
+                      : Text(place.subtitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: AppColors.textTertiary, fontSize: 12),
-                        ),
+                          style: context.type.bodySmall),
                   onTap: () => _selectSuggestion(place),
                 );
               },
@@ -186,52 +190,15 @@ class _HomePinScreenState extends State<HomePinScreen> {
     );
   }
 
-  Future<void> _confirmHomeLocation() async {
-    setState(() => _isSaving = true);
-
-    try {
-      final commuteProvider = context.read<CommuteProvider>();
-      await commuteProvider.updateHomeLocation(
-        _currentCenter.latitude,
-        _currentCenter.longitude,
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Home location saved successfully!'),
-            backgroundColor: AppColors.surfaceElevated,
-          ),
-        );
-
-        if (commuteProvider.isCommuteSelected) {
-          context.go('/dashboard');
-        } else {
-          context.go('/choose-commute');
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save home location: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final c = context.fib;
+    final t = context.type;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: Stack(
         children: [
-          // 1. Full-screen OpenStreetMap
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
@@ -239,119 +206,79 @@ class _HomePinScreenState extends State<HomePinScreen> {
               initialZoom: 15.0,
               onTap: (_, _) => _searchFocus.unfocus(),
               onPositionChanged: (camera, hasGesture) {
-                if (hasGesture) {
-                  setState(() {
-                    _currentCenter = camera.center;
-                  });
-                }
+                if (hasGesture) setState(() => _currentCenter = camera.center);
               },
             ),
             children: [
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.fibus.commuter',
-                tileBuilder: (context, tileWidget, tile) {
-                  return ColorFiltered(
-                    colorFilter: const ColorFilter.matrix([
-                      0.3, 0, 0, 0, 15,
-                      0, 0.32, 0, 0, 20,
-                      0, 0, 0.38, 0, 30,
-                      0, 0, 0, 1, 0,
-                    ]),
-                    child: tileWidget,
-                  );
-                },
+                tileBuilder: (context, tile, _) => ColorFiltered(
+                  colorFilter: ColorFilter.matrix(
+                      isDark ? MapTiles.dark : MapTiles.quiet),
+                  child: tile,
+                ),
               ),
             ],
           ),
 
-          // 2. Fixed Center Pin with Pulse and Shadow
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 40), // Offset to pin tip
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.7),
-                          blurRadius: 18,
-                          spreadRadius: 3,
-                        ),
-                      ],
+          // Fixed pin; the map moves under it.
+          IgnorePointer(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 56),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: c.accent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: c.surface, width: 3),
+                      ),
+                      child: Icon(Icons.home_outlined, size: 20, color: c.onAccent),
                     ),
-                    child: const Icon(
-                      Icons.home_rounded,
-                      color: Colors.white,
-                      size: 26,
+                    Container(width: 2, height: 12, color: c.textPrimary),
+                    Container(
+                      width: 8,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                     ),
-                  ),
-                  Container(
-                    width: 3,
-                    height: 12,
-                    color: AppColors.primary,
-                  ),
-                  Container(
-                    width: 10,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
 
-          // 3. Top Floating App Bar & Search Input
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              padding: const EdgeInsets.fromLTRB(
+                  FibusSpace.s16, FibusSpace.s12, FibusSpace.s16, 0),
               child: Column(
                 children: [
                   Row(
                     children: [
                       Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.surface.withValues(alpha: 0.9),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.glassBorder),
-                        ),
+                        decoration: _floating(c),
                         child: IconButton(
-                          icon: const Icon(Icons.arrow_back_rounded,
-                              color: AppColors.textPrimary),
-                          onPressed: () {
-                            if (context.canPop()) {
-                              context.pop();
-                            } else {
-                              context.go('/dashboard');
-                            }
-                          },
+                          tooltip: 'Back',
+                          icon: const Icon(Icons.arrow_back),
+                          onPressed: () => context.canPop()
+                              ? context.pop()
+                              : context.go('/dashboard'),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: FibusSpace.s8),
                       Expanded(
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface.withValues(alpha: 0.9),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.glassBorder),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.25),
-                                blurRadius: 12,
-                              ),
-                            ],
-                          ),
+                          height: 48,
+                          decoration: _floating(c),
+                          alignment: Alignment.center,
                           child: TextField(
                             controller: _searchController,
                             focusNode: _searchFocus,
@@ -363,138 +290,74 @@ class _HomePinScreenState extends State<HomePinScreen> {
                                 _runSearch(query);
                               }
                             },
-                            style:
-                                const TextStyle(color: AppColors.textPrimary),
+                            style: t.bodyMedium,
                             decoration: InputDecoration(
-                              icon: const Icon(Icons.search_rounded,
-                                  color: AppColors.primaryLight, size: 20),
+                              filled: false,
+                              prefixIcon: const Icon(Icons.search, size: 18),
                               suffixIcon: _isSearching
                                   ? const Padding(
-                                      padding: EdgeInsets.all(12),
+                                      padding: EdgeInsets.all(14),
                                       child: SizedBox(
                                         width: 16,
                                         height: 16,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2),
+                                        child: CircularProgressIndicator(strokeWidth: 2),
                                       ),
                                     )
                                   : _searchController.text.isEmpty
                                       ? null
                                       : IconButton(
-                                          icon: const Icon(Icons.close_rounded,
-                                              color: AppColors.textTertiary,
-                                              size: 18),
+                                          tooltip: 'Clear',
+                                          icon: const Icon(Icons.close, size: 18),
                                           onPressed: _clearSearch,
                                         ),
-                              hintText: 'Search your area, or drag the map',
-                              hintStyle: const TextStyle(
-                                  color: AppColors.textTertiary, fontSize: 14),
+                              hintText: 'Search your area',
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
                               focusedBorder: InputBorder.none,
-                              isDense: true,
+                              contentPadding:
+                                  const EdgeInsets.symmetric(vertical: 14),
                             ),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  _buildSearchResults(),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceVariant.withValues(alpha: 0.85),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: AppColors.glassBorder.withValues(alpha: 0.5)),
-                    ),
-                    child: Text(
-                      'Lat: ${_currentCenter.latitude.toStringAsFixed(5)}, Lng: ${_currentCenter.longitude.toStringAsFixed(5)}',
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
+                  _buildSearchResults(c),
                 ],
               ),
             ),
           ),
 
-          // 4. Bottom Confirm Location Floating Bar
           Positioned(
-            bottom: 28,
-            left: 20,
-            right: 20,
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: AppColors.surface.withValues(alpha: 0.95),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppColors.glassBorder),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.4),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.info_outline_rounded,
-                          color: AppColors.accent, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Fibus uses this to calculate scooter travel time to your boarding stop.',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton.icon(
-                      onPressed: _isSaving ? null : _confirmHomeLocation,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      icon: _isSaving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.check_rounded, color: Colors.white),
-                      label: Text(
-                        _isSaving ? 'Saving Pin...' : 'Confirm Home Location',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
+            left: FibusSpace.s16,
+            right: FibusSpace.s16,
+            bottom: FibusSpace.s16,
+            child: SafeArea(
+              top: false,
+              child: Container(
+                padding: const EdgeInsets.all(FibusSpace.s20),
+                decoration: _floating(c),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Set your home', style: t.titleMedium),
+                    const SizedBox(height: FibusSpace.s4),
+                    Text(
+                      'Drag the map until the pin sits on your gate. Fibus uses '
+                      'it to time your scooter ride to the stop',
+                      style: t.bodySmall,
+                    ),
+                    const SizedBox(height: FibusSpace.s16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: _isSaving ? null : _confirmHomeLocation,
+                        child: Text(_isSaving ? 'Saving' : 'Save home'),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
