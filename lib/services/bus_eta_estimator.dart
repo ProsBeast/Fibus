@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+
 import 'package:latlong2/latlong.dart';
 import 'package:fibus/core/constants/app_constants.dart';
 import 'package:fibus/core/utils/geo_utils.dart';
@@ -80,14 +81,16 @@ class BusEtaEstimator {
     this.passedStopToleranceMeters = 75,
     this.minFixesForLive = 3,
     this.smoothingWindow = AppConstants.smoothingWindow,
-  })  : _polyline = polyline.length >= 2
-            ? polyline
-            : orderedStops.map((s) => s.location).toList(),
-        _stops = orderedStops {
+  }) : _polyline = polyline.length >= 2
+           ? polyline
+           : orderedStops.map((s) => s.location).toList(),
+       _stops = orderedStops {
     _cumulative = [0];
     for (var i = 1; i < _polyline.length; i++) {
-      _cumulative.add(_cumulative[i - 1] +
-          GeoUtils.haversineDistance(_polyline[i - 1], _polyline[i]));
+      _cumulative.add(
+        _cumulative[i - 1] +
+            GeoUtils.haversineDistance(_polyline[i - 1], _polyline[i]),
+      );
     }
     // Stop progress must be non-decreasing in stop order.
     var last = 0.0;
@@ -130,9 +133,9 @@ class BusEtaEstimator {
 
   /// Each stop's position along the route as a 0..1 fraction, in stop order.
   List<double> get stopFractions => [
-        for (final a in _stopAlong)
-          routeLengthMeters <= 0 ? 0.0 : (a / routeLengthMeters).clamp(0.0, 1.0),
-      ];
+    for (final a in _stopAlong)
+      routeLengthMeters <= 0 ? 0.0 : (a / routeLengthMeters).clamp(0.0, 1.0),
+  ];
 
   /// Progress (metres along the route) of the stop with [stopId].
   double? stopProgress(String stopId) {
@@ -164,7 +167,9 @@ class BusEtaEstimator {
       final prev = _fixes.last;
       final dtSec = (atMs - prev.atMs) / 1000.0;
       final delta = along - prev.along;
-      if (delta > 0 && dtSec > 0 && delta / dtSec > _maxPlausibleSpeedMps &&
+      if (delta > 0 &&
+          dtSec > 0 &&
+          delta / dtSec > _maxPlausibleSpeedMps &&
           delta > 500) {
         return; // single-point spike
       }
@@ -190,13 +195,17 @@ class BusEtaEstimator {
         : DateTime.fromMillisecondsSinceEpoch(bus.lastLocationAtServer!);
     if (bus.status == 'stale' ||
         lastFixAt == null ||
-        now.difference(lastFixAt).inSeconds > AppConstants.staleThresholdSeconds) {
+        now.difference(lastFixAt).inSeconds >
+            AppConstants.staleThresholdSeconds) {
       return BusEtaEstimate(status: LiveEtaStatus.stale, lastFixAt: lastFixAt);
     }
 
     final stopIndex = _stops.indexWhere((s) => s.id == stopId);
     if (stopIndex < 0 || _fixes.isEmpty) {
-      return BusEtaEstimate(status: LiveEtaStatus.warmingUp, lastFixAt: lastFixAt);
+      return BusEtaEstimate(
+        status: LiveEtaStatus.warmingUp,
+        lastFixAt: lastFixAt,
+      );
     }
 
     final latest = _fixes.last;
@@ -211,7 +220,10 @@ class BusEtaEstimator {
       );
     }
     if (_lastOffsetMeters > offRouteMeters) {
-      return BusEtaEstimate(status: LiveEtaStatus.offRoute, lastFixAt: lastFixAt);
+      return BusEtaEstimate(
+        status: LiveEtaStatus.offRoute,
+        lastFixAt: lastFixAt,
+      );
     }
     if (_fixes.length < minFixesForLive) {
       return BusEtaEstimate(
@@ -236,8 +248,10 @@ class BusEtaEstimator {
       // Pace = timetable seconds covered per real second over the window
       // (1 = on schedule, 2 = twice as fast). Comparing against the timetable
       // over the same stretch keeps slow and fast road sections comparable.
-      final scheduledCovered =
-          _scheduledSecondsBetween(first.along, latest.along);
+      final scheduledCovered = _scheduledSecondsBetween(
+        first.along,
+        latest.along,
+      );
       final pace = scheduledCovered / spanSec;
       final observedSec = pace <= 0.01
           ? priorSec * 2.0
@@ -288,7 +302,8 @@ class BusEtaEstimator {
       }
     }
     final lastIndex = _stops.length - 1;
-    return clockAt(lastIndex) + (along - _stopAlong[lastIndex]) / _fallbackSpeedMps;
+    return clockAt(lastIndex) +
+        (along - _stopAlong[lastIndex]) / _fallbackSpeedMps;
   }
 
   PolylineProjectionResult _project(LatLng p) =>

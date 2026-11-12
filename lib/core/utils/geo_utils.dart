@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+
 import 'package:latlong2/latlong.dart';
 
 /// Projection result of snapping a point onto a polyline.
@@ -36,9 +37,11 @@ abstract final class GeoUtils {
     final double lat1Rad = p1.latitude * (math.pi / 180.0);
     final double lat2Rad = p2.latitude * (math.pi / 180.0);
     final double deltaLatRad = (p2.latitude - p1.latitude) * (math.pi / 180.0);
-    final double deltaLonRad = (p2.longitude - p1.longitude) * (math.pi / 180.0);
+    final double deltaLonRad =
+        (p2.longitude - p1.longitude) * (math.pi / 180.0);
 
-    final double a = math.sin(deltaLatRad / 2.0) * math.sin(deltaLatRad / 2.0) +
+    final double a =
+        math.sin(deltaLatRad / 2.0) * math.sin(deltaLatRad / 2.0) +
         math.cos(lat1Rad) *
             math.cos(lat2Rad) *
             math.sin(deltaLonRad / 2.0) *
@@ -52,10 +55,12 @@ abstract final class GeoUtils {
   static double calculateBearing(LatLng start, LatLng end) {
     final double lat1 = start.latitude * (math.pi / 180.0);
     final double lat2 = end.latitude * (math.pi / 180.0);
-    final double deltaLng = (end.longitude - start.longitude) * (math.pi / 180.0);
+    final double deltaLng =
+        (end.longitude - start.longitude) * (math.pi / 180.0);
 
     final double y = math.sin(deltaLng) * math.cos(lat2);
-    final double x = math.cos(lat1) * math.sin(lat2) -
+    final double x =
+        math.cos(lat1) * math.sin(lat2) -
         math.sin(lat1) * math.cos(lat2) * math.cos(deltaLng);
 
     final double bearingRad = math.atan2(y, x);
@@ -136,7 +141,8 @@ abstract final class GeoUtils {
     LatLng a,
     LatLng b,
   ) {
-    final double avgLatRad = (a.latitude + b.latitude) / 2.0 * (math.pi / 180.0);
+    final double avgLatRad =
+        (a.latitude + b.latitude) / 2.0 * (math.pi / 180.0);
     final double cosLat = math.cos(avgLatRad);
 
     final double dx = (b.longitude - a.longitude) * cosLat;
@@ -249,7 +255,9 @@ abstract final class GeoUtils {
 
       if (traveled + segDist >= distanceMeters) {
         final double remaining = distanceMeters - traveled;
-        final double t = (segDist > 0.0) ? (remaining / segDist).clamp(0.0, 1.0) : 0.0;
+        final double t = (segDist > 0.0)
+            ? (remaining / segDist).clamp(0.0, 1.0)
+            : 0.0;
         final double lat = a.latitude + t * (b.latitude - a.latitude);
         final double lng = a.longitude + t * (b.longitude - a.longitude);
         return LatLng(lat, lng);

@@ -93,7 +93,9 @@ class LiveBusModel {
   /// Creates a [LiveBusModel] from an RTDB map snapshot.
   factory LiveBusModel.fromRtdb(dynamic data, {String? busId}) {
     if (data is! Map) {
-      throw StateError('Cannot create LiveBusModel from non-map RTDB payload: $data');
+      throw StateError(
+        'Cannot create LiveBusModel from non-map RTDB payload: $data',
+      );
     }
 
     final rawEta = data['busEta'];
@@ -101,7 +103,9 @@ class LiveBusModel {
     if (rawEta is Map) {
       rawEta.forEach((key, value) {
         if (key != null && value != null) {
-          final int? sec = (value is num) ? value.toInt() : int.tryParse(value.toString());
+          final int? sec = (value is num)
+              ? value.toInt()
+              : int.tryParse(value.toString());
           if (sec != null) {
             parsedEta[key.toString()] = sec;
           }

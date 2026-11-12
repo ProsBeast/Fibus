@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer' as developer;
+
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:fibus/commuter/providers/commute_provider.dart';
@@ -26,7 +27,8 @@ AlertAction decideAlertAction({
   DateTime? lastPlanChangeSentAt,
   bool isDelaySignificant = false,
 }) {
-  final active = status == AlertSessionStatus.monitoring ||
+  final active =
+      status == AlertSessionStatus.monitoring ||
       status == AlertSessionStatus.advanceSent ||
       status == AlertSessionStatus.leaveNowSent;
   if (!active) return AlertAction.none;
@@ -36,7 +38,9 @@ AlertAction decideAlertAction({
 
   if (status != AlertSessionStatus.leaveNowSent) {
     if (!now.isBefore(leaveBy)) return AlertAction.sendLeaveNow;
-    final advanceAt = leaveBy.subtract(Duration(minutes: advanceWarningMinutes));
+    final advanceAt = leaveBy.subtract(
+      Duration(minutes: advanceWarningMinutes),
+    );
     if (status == AlertSessionStatus.monitoring && !now.isBefore(advanceAt)) {
       return AlertAction.sendAdvance;
     }
@@ -47,7 +51,8 @@ AlertAction decideAlertAction({
   // moved the plan at least 5 minutes later.
   if (isDelaySignificant && leaveByWhenLeaveNowSent != null) {
     final shift = leaveBy.difference(leaveByWhenLeaveNowSent);
-    final rateOk = lastPlanChangeSentAt == null ||
+    final rateOk =
+        lastPlanChangeSentAt == null ||
         now.difference(lastPlanChangeSentAt) >= const Duration(minutes: 10);
     if (shift >= const Duration(minutes: 5) && rateOk) {
       return AlertAction.sendPlanChanged;
@@ -68,8 +73,8 @@ class AlertSessionProvider extends ChangeNotifier {
   AlertSessionProvider({
     FirestoreService? firestoreService,
     NotificationService? notificationService,
-  })  : _firestore = firestoreService ?? FirestoreService.instance,
-        _notifications = notificationService ?? NotificationService.instance;
+  }) : _firestore = firestoreService ?? FirestoreService.instance,
+       _notifications = notificationService ?? NotificationService.instance;
 
   final FirestoreService _firestore;
   final NotificationService _notifications;
@@ -108,6 +113,7 @@ class AlertSessionProvider extends ChangeNotifier {
     final s = _activeSession;
     return s != null && s.isActive && s.serviceDate == _targetServiceDate;
   }
+
   AlertSessionStatus get currentState =>
       _activeSession?.status ?? AlertSessionStatus.inactive;
   bool get isLoading => _isLoading;
@@ -155,15 +161,15 @@ class AlertSessionProvider extends ChangeNotifier {
     _sessionSubscription = _firestore
         .streamActiveAlertSession(_activeUserId!, date)
         .listen(
-      (session) {
-        _activeSession = session;
-        if (session == null) _resetBookkeeping();
-        notifyListeners();
-      },
-      onError: (err) {
-        developer.log('Alert session stream error', error: err);
-      },
-    );
+          (session) {
+            _activeSession = session;
+            if (session == null) _resetBookkeeping();
+            notifyListeners();
+          },
+          onError: (err) {
+            developer.log('Alert session stream error', error: err);
+          },
+        );
   }
 
   /// Moves to a new service date: when midnight passes, or when today's bus
@@ -184,9 +190,11 @@ class AlertSessionProvider extends ChangeNotifier {
   /// Saves without waiting. Firestore only completes a write when the
   /// server confirms it, so awaiting here would stall alerts while offline.
   void _persist(AlertSession session) {
-    unawaited(_firestore.updateAlertSession(session).catchError((Object e) {
-      developer.log('Failed to persist alert session', error: e);
-    }));
+    unawaited(
+      _firestore.updateAlertSession(session).catchError((Object e) {
+        developer.log('Failed to persist alert session', error: e);
+      }),
+    );
   }
 
   void _resetBookkeeping() {
@@ -201,8 +209,10 @@ class AlertSessionProvider extends ChangeNotifier {
   /// Starts the ticker that checks alert thresholds while a session is active.
   void _startNotificationWatcher() {
     _notificationWatcherTimer?.cancel();
-    _notificationWatcherTimer =
-        Timer.periodic(const Duration(seconds: 5), (_) => _tick());
+    _notificationWatcherTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _tick(),
+    );
   }
 
   Future<void> _tick() async {
@@ -245,7 +255,8 @@ class AlertSessionProvider extends ChangeNotifier {
     final rec = _recommendation;
     // "The bus passed your stop" is about today's run only; it must not
     // close a session armed for the next service day.
-    final sessionIsToday = session.serviceDate == serviceDateKey(DateTime.now());
+    final sessionIsToday =
+        session.serviceDate == serviceDateKey(DateTime.now());
     final leaveBy = rec?.recommendedLeaveBy ?? session.recommendedLeaveBy;
     if (leaveBy == null) return;
     final now = DateTime.now();
@@ -257,7 +268,8 @@ class AlertSessionProvider extends ChangeNotifier {
       leaveBy: leaveBy,
       advanceWarningMinutes: lead,
       etaStatus: sessionIsToday ? _etaStatus : LiveEtaStatus.noTracker,
-      leaveByWhenLeaveNowSent: _leaveByWhenLeaveNowSent ?? session.recommendedLeaveBy,
+      leaveByWhenLeaveNowSent:
+          _leaveByWhenLeaveNowSent ?? session.recommendedLeaveBy,
       lastPlanChangeSentAt: _lastPlanChangeSentAt,
       isDelaySignificant: rec?.isDelaySignificant ?? false,
     );
@@ -265,16 +277,21 @@ class AlertSessionProvider extends ChangeNotifier {
     switch (action) {
       case AlertAction.sendAdvance:
         final minutes = (leaveBy.difference(now).inSeconds / 60).ceil();
-        await _notifications.cancel(NotificationService.advanceWarningNotificationId);
+        await _notifications.cancel(
+          NotificationService.advanceWarningNotificationId,
+        );
         await _notifications.showAdvanceWarningNotification(
           busName: _busName,
           minutesRemaining: minutes < 1 ? 1 : minutes,
           leaveTimeFormatted: _fmt(leaveBy),
         );
-        await _saveSession(session.copyWith(
-          status: AlertSessionStatus.advanceSent,
-          advanceNotificationStatus: 'sent',
-        ), rec);
+        await _saveSession(
+          session.copyWith(
+            status: AlertSessionStatus.advanceSent,
+            advanceNotificationStatus: 'sent',
+          ),
+          rec,
+        );
         break;
       case AlertAction.sendLeaveNow:
         await _notifications.cancel(NotificationService.leaveNowNotificationId);
@@ -284,10 +301,13 @@ class AlertSessionProvider extends ChangeNotifier {
           etaFormatted: _fmt(rec?.busEta ?? session.busEta ?? leaveBy),
         );
         _leaveByWhenLeaveNowSent = leaveBy;
-        await _saveSession(session.copyWith(
-          status: AlertSessionStatus.leaveNowSent,
-          leaveNowStatus: 'sent',
-        ), rec);
+        await _saveSession(
+          session.copyWith(
+            status: AlertSessionStatus.leaveNowSent,
+            leaveNowStatus: 'sent',
+          ),
+          rec,
+        );
         break;
       case AlertAction.sendPlanChanged:
         _lastPlanChangeSentAt = now;
@@ -302,7 +322,9 @@ class AlertSessionProvider extends ChangeNotifier {
       case AlertAction.complete:
         await _cancelScheduled();
         await _saveSession(
-            session.copyWith(status: AlertSessionStatus.completed), rec);
+          session.copyWith(status: AlertSessionStatus.completed),
+          rec,
+        );
         break;
       case AlertAction.none:
         await _reconcileScheduled(session, leaveBy, lead);
@@ -313,14 +335,20 @@ class AlertSessionProvider extends ChangeNotifier {
 
   /// Keeps OS-scheduled alerts at the current leave-by time (best effort).
   Future<void> _reconcileScheduled(
-      AlertSession session, DateTime leaveBy, int lead) async {
-    final moved = _osScheduledLeaveBy == null ||
-        leaveBy.difference(_osScheduledLeaveBy!).abs() >= const Duration(seconds: 60);
+    AlertSession session,
+    DateTime leaveBy,
+    int lead,
+  ) async {
+    final moved =
+        _osScheduledLeaveBy == null ||
+        leaveBy.difference(_osScheduledLeaveBy!).abs() >=
+            const Duration(seconds: 60);
     if (!moved && _osScheduledForStatus == session.status) return;
 
     final now = DateTime.now();
     final advanceAt = leaveBy.subtract(Duration(minutes: lead));
-    if (session.status == AlertSessionStatus.monitoring && advanceAt.isAfter(now)) {
+    if (session.status == AlertSessionStatus.monitoring &&
+        advanceAt.isAfter(now)) {
       await _notifications.scheduleDepartureAlert(
         id: NotificationService.advanceWarningNotificationId,
         when: advanceAt,
@@ -328,7 +356,8 @@ class AlertSessionProvider extends ChangeNotifier {
         body: 'Head out by ${_fmt(leaveBy)} to catch $_busName.',
       );
     }
-    if (session.status != AlertSessionStatus.leaveNowSent && leaveBy.isAfter(now)) {
+    if (session.status != AlertSessionStatus.leaveNowSent &&
+        leaveBy.isAfter(now)) {
       await _notifications.scheduleDepartureAlert(
         id: NotificationService.leaveNowNotificationId,
         when: leaveBy,
@@ -341,7 +370,9 @@ class AlertSessionProvider extends ChangeNotifier {
   }
 
   Future<void> _cancelScheduled() async {
-    await _notifications.cancel(NotificationService.advanceWarningNotificationId);
+    await _notifications.cancel(
+      NotificationService.advanceWarningNotificationId,
+    );
     await _notifications.cancel(NotificationService.leaveNowNotificationId);
     _osScheduledLeaveBy = null;
     _osScheduledForStatus = null;
@@ -350,21 +381,28 @@ class AlertSessionProvider extends ChangeNotifier {
   /// Stores the moving recommendation on the session (versioned), at most
   /// once a minute and only when leave-by shifted by a minute or more.
   Future<void> _maybePersistRecommendation(
-      AlertSession session, DepartureRecommendation? rec) async {
+    AlertSession session,
+    DepartureRecommendation? rec,
+  ) async {
     if (rec == null) return;
     final now = DateTime.now();
-    final shifted = _persistedLeaveBy == null ||
+    final shifted =
+        _persistedLeaveBy == null ||
         rec.recommendedLeaveBy.difference(_persistedLeaveBy!).abs() >=
             const Duration(minutes: 1);
-    final throttled = _lastPersistAt != null &&
+    final throttled =
+        _lastPersistAt != null &&
         now.difference(_lastPersistAt!) < const Duration(minutes: 1);
     if (!shifted || throttled) return;
     await _saveSession(session, rec);
   }
 
   Future<void> _saveSession(
-      AlertSession session, DepartureRecommendation? rec) async {
-    final changed = rec != null &&
+    AlertSession session,
+    DepartureRecommendation? rec,
+  ) async {
+    final changed =
+        rec != null &&
         session.recommendedLeaveBy != null &&
         rec.recommendedLeaveBy.difference(session.recommendedLeaveBy!).abs() >=
             const Duration(minutes: 1);
@@ -427,10 +465,12 @@ class AlertSessionProvider extends ChangeNotifier {
       _resetBookkeeping();
       _activeSession = session;
       _persistedLeaveBy = session.recommendedLeaveBy;
-      unawaited(_firestore.createAlertSession(session).catchError((Object e) {
-        developer.log('Failed to save alert session', error: e);
-        return session.id;
-      }));
+      unawaited(
+        _firestore.createAlertSession(session).catchError((Object e) {
+          developer.log('Failed to save alert session', error: e);
+          return session.id;
+        }),
+      );
 
       _isLoading = false;
       notifyListeners();
@@ -456,13 +496,17 @@ class AlertSessionProvider extends ChangeNotifier {
 
     try {
       await _notifications.cancelAll();
-      _activeSession = _activeSession?.copyWith(status: AlertSessionStatus.cancelled);
+      _activeSession = _activeSession?.copyWith(
+        status: AlertSessionStatus.cancelled,
+      );
       _resetBookkeeping();
       _isLoading = false;
       notifyListeners();
-      unawaited(_firestore.cancelAlertSession(sessionId).catchError((Object e) {
-        developer.log('Failed to save alert cancellation', error: e);
-      }));
+      unawaited(
+        _firestore.cancelAlertSession(sessionId).catchError((Object e) {
+          developer.log('Failed to save alert cancellation', error: e);
+        }),
+      );
     } catch (e, stack) {
       developer.log('Failed to cancel alerts', error: e, stackTrace: stack);
       _errorMessage = 'Could not cancel alerts.';

@@ -31,9 +31,14 @@ class _SignInScreenState extends State<SignInScreen> {
         // Null with an error set means it failed; null alone means the
         // commuter closed the Google picker.
         if (authService.errorMessage != null) {
-          messenger.showSnackBar(const SnackBar(
-              content: Text('Could not sign in. Check your connection '
-                  'and try again')));
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Could not sign in. Check your connection '
+                'and try again',
+              ),
+            ),
+          );
         }
         return;
       }
@@ -74,7 +79,11 @@ class _SignInScreenState extends State<SignInScreen> {
         child: LayoutBuilder(
           builder: (context, box) => SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(
-                FibusSpace.page, FibusSpace.s24, FibusSpace.page, FibusSpace.s24),
+              FibusSpace.page,
+              FibusSpace.s24,
+              FibusSpace.page,
+              FibusSpace.s24,
+            ),
             child: ConstrainedBox(
               constraints: BoxConstraints(minHeight: box.maxHeight - 48),
               child: Column(
@@ -82,8 +91,10 @@ class _SignInScreenState extends State<SignInScreen> {
                 children: [
                   const FibusWordmark(),
                   const SizedBox(height: FibusSpace.s48),
-                  Text('Leave home just in time for your bus',
-                      style: t.headlineMedium),
+                  Text(
+                    'Leave home just in time for your bus',
+                    style: t.headlineMedium,
+                  ),
                   const SizedBox(height: FibusSpace.s12),
                   Text(
                     'Fibus follows the bus on its route and your ride to the '
@@ -102,7 +113,9 @@ class _SignInScreenState extends State<SignInScreen> {
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: c.textMuted),
+                                strokeWidth: 2,
+                                color: c.textMuted,
+                              ),
                             )
                           : const Text('Continue with Google'),
                     ),
@@ -135,28 +148,52 @@ class _AnswerPreview extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Leave by', style: t.labelMedium),
-            const SizedBox(height: FibusSpace.s4),
             Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
               children: [
-                const ClockFigure('7:41', size: 44),
-                const SizedBox(width: FibusSpace.s8),
-                Text('am',
-                    style: FibusType.figure(context, size: 16, color: c.textSecondary)),
+                Expanded(child: Text('Leave by', style: t.labelMedium)),
+                // Says plainly that this is a sample, not the user's data.
+                Text('Example', style: t.labelSmall),
               ],
             ),
+            const SizedBox(height: FibusSpace.s4),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  const ClockFigure('7:41', size: 44),
+                  const SizedBox(width: FibusSpace.s8),
+                  Text(
+                    'am',
+                    style: FibusType.figure(
+                      context,
+                      size: 16,
+                      color: c.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: FibusSpace.s8),
-            Text('Bus 9 reaches Lingampally at 7:59 am, 12 min by scooter',
-                style: t.bodySmall),
+            Text(
+              'Bus 9 reaches Lingampally at 7:59 am, 12 min by scooter',
+              style: t.bodySmall,
+            ),
             const SizedBox(height: FibusSpace.s16),
             Divider(color: c.hairline),
             const SizedBox(height: FibusSpace.s12),
             const RouteStrip(
               stopNames: [
-                'Isnapur', 'Patancheru', 'R C Puram', 'Lingampally',
-                'Nallagandla', 'Gopanpally', 'V N Pally', 'MGIT',
+                'Isnapur',
+                'Patancheru',
+                'R C Puram',
+                'Lingampally',
+                'Nallagandla',
+                'Gopanpally',
+                'V N Pally',
+                'MGIT',
               ],
               stopFractions: [0, 0.17, 0.32, 0.41, 0.5, 0.63, 0.79, 1],
               boardingIndex: 3,

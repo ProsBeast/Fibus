@@ -47,7 +47,9 @@ class RouteModel {
   final DateTime? updatedAt;
 
   /// Factory constructor to parse a Firestore document snapshot.
-  factory RouteModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot) {
+  factory RouteModel.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> snapshot,
+  ) {
     final data = snapshot.data() ?? {};
     return RouteModel.fromMap(data, snapshot.id);
   }
@@ -92,7 +94,9 @@ class RouteModel {
       'polylinePoints': polylinePoints
           .map((p) => {'lat': p.latitude, 'lng': p.longitude})
           .toList(),
-      'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
+      'createdAt': createdAt != null
+          ? Timestamp.fromDate(createdAt!)
+          : FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }

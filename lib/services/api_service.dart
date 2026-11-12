@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:http/http.dart' as http;
 import 'package:fibus/core/constants/api_endpoints.dart';
 
@@ -27,11 +28,7 @@ class ApiResult<T> {
 
   /// Creates a successful result holding [data].
   factory ApiResult.success(T data, {int statusCode = 200}) {
-    return ApiResult._(
-      isSuccess: true,
-      data: data,
-      statusCode: statusCode,
-    );
+    return ApiResult._(isSuccess: true, data: data, statusCode: statusCode);
   }
 
   /// Creates a failure result with an [errorMessage] and optional [statusCode].
@@ -81,7 +78,8 @@ class ApiService {
     return _instance;
   }
 
-  ApiService._internal({http.Client? client}) : _client = client ?? http.Client();
+  ApiService._internal({http.Client? client})
+    : _client = client ?? http.Client();
 
   // ---------------------------------------------------------------------------
   // Headers Helper
@@ -169,7 +167,9 @@ class ApiService {
     required double accuracy,
     required String token,
   }) async {
-    final url = Uri.parse('${ApiEndpoints.vercelBaseUrl}/trips/process-location');
+    final url = Uri.parse(
+      '${ApiEndpoints.vercelBaseUrl}/trips/process-location',
+    );
     final body = jsonEncode({
       'busId': busId,
       'latitude': lat,
@@ -207,9 +207,8 @@ class ApiService {
       'homeLng': homeLng.toString(),
     };
 
-    final uri = Uri.parse(ApiEndpoints.calculateEta).replace(
-      queryParameters: queryParams,
-    );
+    final uri = Uri.parse(ApiEndpoints.calculateEta)
+        .replace(queryParameters: queryParams);
 
     return _get(uri, headers: _buildHeaders(token));
   }
@@ -243,14 +242,18 @@ class ApiService {
     required Map<String, String> headers,
   }) async {
     try {
-      final response = await _client.get(uri, headers: headers).timeout(requestTimeout);
+      final response = await _client
+          .get(uri, headers: headers)
+          .timeout(requestTimeout);
       return _parseJsonResponse(response);
     } on SocketException catch (e) {
       return ApiResult.failure('Network connection error: ${e.message}');
     } on TimeoutException {
       return ApiResult.failure('Backend request timed out. Please try again.');
     } on FormatException catch (e) {
-      return ApiResult.failure('Malformed JSON response from server: ${e.message}');
+      return ApiResult.failure(
+        'Malformed JSON response from server: ${e.message}',
+      );
     } catch (e) {
       return ApiResult.failure('Unexpected network error: $e');
     }
@@ -272,7 +275,9 @@ class ApiService {
     } on TimeoutException {
       return ApiResult.failure('Backend request timed out. Please try again.');
     } on FormatException catch (e) {
-      return ApiResult.failure('Malformed JSON response from server: ${e.message}');
+      return ApiResult.failure(
+        'Malformed JSON response from server: ${e.message}',
+      );
     } catch (e) {
       return ApiResult.failure('Unexpected network error: $e');
     }
@@ -281,13 +286,15 @@ class ApiService {
   ApiResult<Map<String, dynamic>> _parseJsonResponse(http.Response response) {
     try {
       final decoded = jsonDecode(response.body);
-      final Map<String, dynamic> data =
-          decoded is Map<String, dynamic> ? decoded : {'result': decoded};
+      final Map<String, dynamic> data = decoded is Map<String, dynamic>
+          ? decoded
+          : {'result': decoded};
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return ApiResult.success(data, statusCode: response.statusCode);
       } else {
-        final errorMsg = data['error'] ??
+        final errorMsg =
+            data['error'] ??
             data['message'] ??
             'Request failed with HTTP status ${response.statusCode}.';
         return ApiResult.failure(
@@ -298,7 +305,9 @@ class ApiService {
       }
     } catch (e) {
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        return ApiResult.success({'body': response.body}, statusCode: response.statusCode);
+        return ApiResult.success({
+          'body': response.body,
+        }, statusCode: response.statusCode);
       }
       return ApiResult.failure(
         'Server returned HTTP ${response.statusCode}: ${response.body}',

@@ -7,6 +7,7 @@ import 'package:fibus/commuter/widgets/bus_eta_card.dart';
 import 'package:fibus/commuter/widgets/departure_countdown.dart';
 import 'package:fibus/commuter/widgets/route_map_view.dart';
 import 'package:fibus/core/theme/fibus_palette.dart';
+import 'package:fibus/core/widgets/error_display.dart';
 import 'package:fibus/core/widgets/fib_card.dart';
 import 'package:fibus/core/widgets/fibus_wordmark.dart';
 import 'package:fibus/models/alert_session.dart';
@@ -44,9 +45,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     if (alertProvider.isActive) {
       await alertProvider.cancelAlerts();
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Alerts off')),
-      );
+      messenger.showSnackBar(const SnackBar(content: Text('Alerts off')));
       return;
     }
     final pref = commuteProvider.currentPreference;
@@ -56,9 +55,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         preference: pref,
         recommendation: commuteProvider.departureRecommendation,
       );
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Alerts on')),
-      );
+      messenger.showSnackBar(const SnackBar(content: Text('Alerts on')));
     } catch (_) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Could not turn on alerts. Try again')),
@@ -92,10 +89,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onRefresh: _handleRefresh,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(FibusSpace.page,
-                    FibusSpace.s8, FibusSpace.page, FibusSpace.s32),
+                padding: const EdgeInsets.fromLTRB(
+                  FibusSpace.page,
+                  FibusSpace.s8,
+                  FibusSpace.page,
+                  FibusSpace.s32,
+                ),
                 children: [
-                  if (!configured) ...[
+                  // A failed load must not look like "you never set up".
+                  if (pref == null && commute.errorMessage != null) ...[
+                    ErrorDisplay(
+                      compact: true,
+                      title: 'Could not load your commute',
+                      message: 'Check your connection and try again',
+                      onRetry: _handleRefresh,
+                    ),
+                    const SizedBox(height: FibusSpace.s16),
+                  ] else if (!configured) ...[
                     _SetupCard(pref: pref),
                     const SizedBox(height: FibusSpace.s16),
                   ],
@@ -122,7 +132,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       alerts: alerts,
                       dayLabel: commute.serviceDay == null
                           ? ''
-                          : relativeDayLabel(commute.serviceDay!, DateTime.now()),
+                          : relativeDayLabel(
+                              commute.serviceDay!,
+                              DateTime.now(),
+                            ),
                       leadMinutes: pref.advanceWarningMinutes,
                       onToggle: alerts.isLoading ? null : _toggleAlerts,
                     ),
@@ -154,8 +167,10 @@ class _SetupCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(needsHome ? 'Set your home' : 'Choose your bus and stop',
-              style: t.titleMedium),
+          Text(
+            needsHome ? 'Set your home' : 'Choose your bus and stop',
+            style: t.titleMedium,
+          ),
           const SizedBox(height: FibusSpace.s4),
           Text(
             needsHome
@@ -214,7 +229,11 @@ class _AlertsCard extends StatelessWidget {
 
     return FibCard(
       padding: const EdgeInsets.fromLTRB(
-          FibusSpace.s20, FibusSpace.s16, FibusSpace.s12, FibusSpace.s16),
+        FibusSpace.s20,
+        FibusSpace.s16,
+        FibusSpace.s12,
+        FibusSpace.s16,
+      ),
       child: Row(
         children: [
           SizedBox(
@@ -232,15 +251,19 @@ class _AlertsCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Alerts for ${dayLabel.isEmpty ? 'today' : dayLabel}',
-                    style: t.titleSmall),
+                Text(
+                  'Alerts for ${dayLabel.isEmpty ? 'today' : dayLabel}',
+                  style: t.titleSmall,
+                ),
                 const SizedBox(height: FibusSpace.s4),
                 Text(
                   blocked
                       ? 'Notifications are off for Fibus in Android settings, '
-                          'so alerts cannot reach you'
+                            'so alerts cannot reach you'
                       : _subtitle(),
-                  style: t.bodySmall?.copyWith(color: blocked ? c.negative : null),
+                  style: t.bodySmall?.copyWith(
+                    color: blocked ? c.negative : null,
+                  ),
                 ),
               ],
             ),

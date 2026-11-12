@@ -38,7 +38,9 @@ class StopModel {
   LatLng get location => LatLng(latitude, longitude);
 
   /// Factory constructor for Firestore documents.
-  factory StopModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot) {
+  factory StopModel.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> snapshot,
+  ) {
     final data = snapshot.data() ?? {};
     return StopModel.fromMap(data, snapshot.id);
   }
@@ -51,7 +53,8 @@ class StopModel {
       latitude: (map['latitude'] as num?)?.toDouble() ?? 17.3850,
       longitude: (map['longitude'] as num?)?.toDouble() ?? 78.4867,
       sequenceIndex: (map['sequenceIndex'] as num?)?.toInt() ?? 0,
-      scheduledArrivalLocalTime: map['scheduledArrivalLocalTime'] as String? ?? '07:50',
+      scheduledArrivalLocalTime:
+          map['scheduledArrivalLocalTime'] as String? ?? '07:50',
       isActive: map['isActive'] as bool? ?? true,
     );
   }

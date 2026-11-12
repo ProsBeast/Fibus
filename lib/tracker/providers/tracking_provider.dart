@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:fibus/core/constants/app_constants.dart';
@@ -27,7 +28,7 @@ class TrackingProvider extends ChangeNotifier {
 
   /// Creates a [TrackingProvider] instance.
   TrackingProvider({LocationService? locationService})
-      : _locationService = locationService ?? LocationService.instance {
+    : _locationService = locationService ?? LocationService.instance {
     _locationService.addListener(_onServiceChanged);
   }
 
@@ -92,10 +93,14 @@ class TrackingProvider extends ChangeNotifier {
   /// Formatted elapsed duration string in `HH:mm:ss` format.
   String get sessionDurationFormatted {
     final hours = _sessionDuration.inHours.toString().padLeft(2, '0');
-    final minutes =
-        (_sessionDuration.inMinutes % 60).toString().padLeft(2, '0');
-    final seconds =
-        (_sessionDuration.inSeconds % 60).toString().padLeft(2, '0');
+    final minutes = (_sessionDuration.inMinutes % 60).toString().padLeft(
+      2,
+      '0',
+    );
+    final seconds = (_sessionDuration.inSeconds % 60).toString().padLeft(
+      2,
+      '0',
+    );
     return '$hours:$minutes:$seconds';
   }
 
@@ -146,7 +151,9 @@ class TrackingProvider extends ChangeNotifier {
 
     // Subscribe to position updates from LocationService
     await _positionSubscription?.cancel();
-    _positionSubscription = _locationService.lastPosition.listen(_handleNewPosition);
+    _positionSubscription = _locationService.lastPosition.listen(
+      _handleNewPosition,
+    );
 
     // Start the underlying LocationService
     await _locationService.startTracking(

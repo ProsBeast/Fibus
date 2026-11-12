@@ -9,9 +9,9 @@ import 'package:fibus/services/service_calendar.dart';
 
 /// Formats a time as `7:41` plus a lowercase `am`, timetable style.
 ({String clock, String meridiem}) splitTime(DateTime t) => (
-      clock: DateFormat('h:mm').format(t),
-      meridiem: DateFormat('a').format(t).toLowerCase(),
-    );
+  clock: DateFormat('h:mm').format(t),
+  meridiem: DateFormat('a').format(t).toLowerCase(),
+);
 
 /// `18 min`, `1 h 05 min`, `3 days`.
 String formatDuration(Duration d) {
@@ -52,8 +52,8 @@ class DepartureCountdown extends StatelessWidget {
     final eta = splitTime(rec.busEta);
     final untilLeave = rec.recommendedLeaveBy.difference(DateTime.now());
     final rideMin = (rec.scooterDurationSeconds / 60).ceil();
-    final bufferMin =
-        ((rec.safetyMarginSeconds + 300) / 60).ceil(); // margin + 5 min at stop
+    final bufferMin = ((rec.safetyMarginSeconds + 300) / 60)
+        .ceil(); // margin + 5 min at stop
 
     final String countdown;
     if (!leaveNow) {
@@ -73,42 +73,64 @@ class DepartureCountdown extends StatelessWidget {
         child: FibCard(
           borderColor: leaveNow ? c.accent : null,
           padding: const EdgeInsets.fromLTRB(
-              FibusSpace.s20, FibusSpace.s20, FibusSpace.s20, FibusSpace.s16),
+            FibusSpace.s20,
+            FibusSpace.s20,
+            FibusSpace.s20,
+            FibusSpace.s16,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(leaveNow ? 'Leave now' : leaveLabel,
-                  style: t.labelMedium?.copyWith(
-                      color: leaveNow ? c.accentInk : c.textSecondary)),
+              Text(
+                leaveNow ? 'Leave now' : leaveLabel,
+                style: t.labelMedium?.copyWith(
+                  color: leaveNow ? c.accentInk : c.textSecondary,
+                ),
+              ),
               const SizedBox(height: FibusSpace.s4),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  ClockFigure(leave.clock, size: 56),
-                  const SizedBox(width: FibusSpace.s8),
-                  Text(leave.meridiem,
-                      style: FibusType.figure(context,
-                          size: 20, color: c.textSecondary)),
-                ],
+              // The figure is already display size; with very large system
+              // text it shrinks to the card width instead of being cut off.
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    ClockFigure(leave.clock, size: 56),
+                    const SizedBox(width: FibusSpace.s8),
+                    Text(
+                      leave.meridiem,
+                      style: FibusType.figure(
+                        context,
+                        size: 20,
+                        color: c.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: FibusSpace.s8),
-              Text(countdown,
-                  style: t.bodyMedium?.copyWith(
-                      color: leaveNow ? c.textPrimary : c.textSecondary)),
+              Text(
+                countdown,
+                style: t.bodyMedium?.copyWith(
+                  color: leaveNow ? c.textPrimary : c.textSecondary,
+                ),
+              ),
               const SizedBox(height: FibusSpace.s16),
               const Divider(),
               const SizedBox(height: FibusSpace.s12),
-              Row(
+              // Wraps onto a second line with large text, never mid-number.
+              Wrap(
+                spacing: FibusSpace.s24,
+                runSpacing: FibusSpace.s12,
                 children: [
-                  Expanded(
-                    child: _Fact(
-                      label: 'Bus at stop',
-                      value: '${eta.clock} ${eta.meridiem}',
-                    ),
+                  _Fact(
+                    label: 'Bus at stop',
+                    value: '${eta.clock} ${eta.meridiem}',
                   ),
-                  Expanded(child: _Fact(label: 'Scooter ride', value: '$rideMin min')),
-                  Expanded(child: _Fact(label: 'Buffer', value: '$bufferMin min')),
+                  _Fact(label: 'Scooter ride', value: '$rideMin min'),
+                  _Fact(label: 'Buffer', value: '$bufferMin min'),
                 ],
               ),
             ],
@@ -129,12 +151,13 @@ class _Fact extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: context.type.labelSmall),
+        Text(label, style: context.type.labelSmall),
         const SizedBox(height: FibusSpace.s4),
-        Text(value, style: FibusType.figure(context, size: 15)),
+        Text(
+          value,
+          softWrap: false,
+          style: FibusType.figure(context, size: 15),
+        ),
       ],
     );
   }

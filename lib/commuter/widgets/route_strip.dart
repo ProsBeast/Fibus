@@ -33,89 +33,130 @@ class RouteStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     if (stopFractions.length < 2) return const SizedBox(height: _height);
     final c = context.fib;
+    final scaler = MediaQuery.textScalerOf(context);
+    final base = context.type.labelSmall!;
+    final boardStyle = base.copyWith(
+      color: c.textPrimary,
+      fontWeight: FontWeight.w500,
+    );
+    final endStyle = base.copyWith(color: c.textMuted);
+
+    double measure(String text, TextStyle style) {
+      final tp = TextPainter(
+        text: TextSpan(text: text, style: style),
+        maxLines: 1,
+        textDirection: TextDirection.ltr,
+        textScaler: scaler,
+      )..layout();
+      final w = tp.width;
+      tp.dispose();
+      return w;
+    }
+
+    final labelHeight =
+        scaler.scale(base.fontSize ?? 12) * (base.height ?? 1.3);
+    const labelTop = _lineY + 14;
 
     return Semantics(
       label: _describe(),
       child: ExcludeSemantics(
         child: SizedBox(
-          height: _height,
-          child: LayoutBuilder(builder: (context, box) {
-            final w = box.maxWidth - _inset * 2;
-            double x(double f) => _inset + f * w;
+          height: labelTop + labelHeight + 2,
+          child: LayoutBuilder(
+            builder: (context, box) {
+              final maxW = box.maxWidth;
+              final w = maxW - _inset * 2;
+              double x(double f) => _inset + f * w;
+              final last = stopNames.length - 1;
 
-            final labels = <_Label>[
-              _Label(0, TextAlign.left),
-              if (boardingIndex > 0 && boardingIndex < stopNames.length - 1)
-                _Label(boardingIndex, TextAlign.center),
-              _Label(stopNames.length - 1, TextAlign.right),
-            ];
-            // Drop an end label that would collide with the boarding label.
-            final boardX = x(stopFractions[boardingIndex]);
-            labels.removeWhere((l) =>
-                l.index != boardingIndex &&
-                (x(stopFractions[l.index]) - boardX).abs() < 84 &&
-                labels.any((o) => o.index == boardingIndex));
+              // The boarding label is laid out first, at its measured width.
+              // The end labels only get the room that is left, and are
+              // dropped when that is too little to read, so nothing overlaps.
+              final boardText = 'You · ${stopNames[boardingIndex]}';
+              final boardW = (measure(boardText, boardStyle) + 1).clamp(
+                0.0,
+                maxW,
+              );
+              final boardCx = x(stopFractions[boardingIndex]);
+              final double boardLeft = boardingIndex == 0
+                  ? 0
+                  : boardingIndex == last
+                  ? maxW - boardW
+                  : (boardCx - boardW / 2).clamp(0.0, maxW - boardW);
+              final boardRight = boardLeft + boardW;
 
-            return Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _StripPainter(
-                      fractions: stopFractions,
-                      boardingIndex: boardingIndex,
-                      busFraction: busFraction,
-                      inset: _inset,
-                      lineY: _lineY,
-                      line: c.textMuted.withValues(alpha: 0.35),
-                      travelled: c.textPrimary,
-                      tickAhead: c.textMuted,
-                      fill: c.surface,
+              const gap = 12.0;
+              const minReadable = 40.0;
+              Widget? endLabel(int index, {required bool atStart}) {
+                if (index == boardingIndex) return null;
+                final room = atStart
+                    ? boardLeft - gap
+                    : maxW - boardRight - gap;
+                if (room < minReadable) return null;
+                final wanted = measure(stopNames[index], endStyle) + 1;
+                final width = wanted < room ? wanted : room;
+                return Positioned(
+                  left: atStart ? 0 : maxW - width,
+                  top: labelTop,
+                  width: width,
+                  child: Text(
+                    stopNames[index],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: endStyle,
+                  ),
+                );
+              }
+
+              final startLabel = endLabel(0, atStart: true);
+              final finishLabel = endLabel(last, atStart: false);
+              final bus = busFraction;
+
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _StripPainter(
+                        fractions: stopFractions,
+                        boardingIndex: boardingIndex,
+                        busFraction: busFraction,
+                        inset: _inset,
+                        lineY: _lineY,
+                        line: c.textMuted.withValues(alpha: 0.35),
+                        travelled: c.textPrimary,
+                        tickAhead: c.textMuted,
+                        fill: c.surface,
+                      ),
                     ),
                   ),
-                ),
-                if (busFraction != null)
+                  if (bus != null)
+                    Positioned(
+                      // Kept inside the strip at either end of the route.
+                      left: (x(bus) - 12).clamp(0.0, maxW - 24),
+                      top: _lineY - 30,
+                      child: _BusMarker(live: busIsLive),
+                    ),
+                  ?startLabel,
+                  ?finishLabel,
                   Positioned(
-                    left: x(busFraction!) - 12,
-                    top: _lineY - 30,
-                    child: _BusMarker(live: busIsLive),
+                    left: boardLeft,
+                    top: labelTop,
+                    width: boardW,
+                    child: Text(
+                      boardText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: boardStyle,
+                    ),
                   ),
-                for (final l in labels)
-                  _positionedLabel(context, l, x(stopFractions[l.index]),
-                      box.maxWidth),
-              ],
-            );
-          }),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
-  }
-
-  Widget _positionedLabel(
-      BuildContext context, _Label l, double cx, double maxWidth) {
-    final c = context.fib;
-    final isBoarding = l.index == boardingIndex;
-    final text = Text(
-      isBoarding ? 'You · ${stopNames[l.index]}' : stopNames[l.index],
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      textAlign: l.align,
-      style: context.type.labelSmall?.copyWith(
-        color: isBoarding ? c.textPrimary : c.textMuted,
-        fontWeight: isBoarding ? FontWeight.w500 : FontWeight.w400,
-      ),
-    );
-    const width = 132.0;
-    double left;
-    switch (l.align) {
-      case TextAlign.left:
-        left = 0;
-      case TextAlign.right:
-        left = maxWidth - width;
-      default:
-        left = (cx - width / 2).clamp(0, maxWidth - width);
-    }
-    return Positioned(left: left, top: _lineY + 14, width: width, child: text);
   }
 
   String _describe() {
@@ -127,12 +168,6 @@ class RouteStrip extends StatelessWidget {
     final next = ahead < 0 ? stopNames.last : stopNames[ahead];
     return 'The bus is before $next, heading to $stop';
   }
-}
-
-class _Label {
-  _Label(this.index, this.align);
-  final int index;
-  final TextAlign align;
 }
 
 class _BusMarker extends StatelessWidget {
@@ -150,8 +185,11 @@ class _BusMarker extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: c.accent, width: live ? 0 : 1.5),
       ),
-      child: Icon(Icons.directions_bus_outlined,
-          size: 14, color: live ? c.onAccent : c.accentInk),
+      child: Icon(
+        Icons.directions_bus_outlined,
+        size: 14,
+        color: live ? c.onAccent : c.accentInk,
+      ),
     );
   }
 }
@@ -252,8 +290,12 @@ class ClockFigure extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       time,
-      style: FibusType.figure(context,
-          size: size, weight: FontWeight.w500, color: color),
+      style: FibusType.figure(
+        context,
+        size: size,
+        weight: FontWeight.w500,
+        color: color,
+      ),
     );
   }
 }

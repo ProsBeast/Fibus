@@ -40,7 +40,7 @@ class FirestoreService {
   }
 
   FirestoreService._internal({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   /// Waits for a write to reach the server, but not forever.
   ///
@@ -50,9 +50,9 @@ class FirestoreService {
   /// saved: it is in the cache and syncs when the network returns. A real
   /// rejection (for example by the security rules) still throws.
   Future<void> _commit(Future<void> write) => write.timeout(
-        AppConstants.saveTimeout,
-        onTimeout: () => debugPrint('Firestore write queued for sync'),
-      );
+    AppConstants.saveTimeout,
+    onTimeout: () => debugPrint('Firestore write queued for sync'),
+  );
 
   // ---------------------------------------------------------------------------
   // User Profile CRUD
@@ -73,10 +73,9 @@ class FirestoreService {
   /// Creates or updates a full user record in `users/{uid}`.
   Future<void> saveUser(UserModel user) async {
     try {
-      await _firestore.doc(FirebasePaths.user(user.uid)).set(
-            user.toFirestore(),
-            SetOptions(merge: true),
-          );
+      await _firestore
+          .doc(FirebasePaths.user(user.uid))
+          .set(user.toFirestore(), SetOptions(merge: true));
     } catch (e) {
       debugPrint('FirestoreService.saveUser error (${user.uid}): $e');
       rethrow;
@@ -188,8 +187,10 @@ class FirestoreService {
         .collection(FirebasePaths.busesCollection)
         .where('isActive', isEqualTo: true)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => BusModel.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) =>
+              snapshot.docs.map((doc) => BusModel.fromFirestore(doc)).toList(),
+        );
   }
 
   /// Real-time stream of all registered buses.
@@ -197,8 +198,10 @@ class FirestoreService {
     return _firestore
         .collection(FirebasePaths.busesCollection)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => BusModel.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) =>
+              snapshot.docs.map((doc) => BusModel.fromFirestore(doc)).toList(),
+        );
   }
 
   // ---------------------------------------------------------------------------
@@ -220,12 +223,11 @@ class FirestoreService {
   /// Fetches all registered bus routes.
   Future<List<RouteModel>> getAllRoutes() async {
     try {
-      final snapshot =
-          await _firestore.collection(FirebasePaths.routesCollection).get();
+      final snapshot = await _firestore
+          .collection(FirebasePaths.routesCollection)
+          .get();
 
-      return snapshot.docs
-          .map((doc) => RouteModel.fromFirestore(doc))
-          .toList();
+      return snapshot.docs.map((doc) => RouteModel.fromFirestore(doc)).toList();
     } catch (e) {
       debugPrint('FirestoreService.getAllRoutes error: $e');
       rethrow;
@@ -240,9 +242,7 @@ class FirestoreService {
           .where('isActive', isEqualTo: true)
           .get();
 
-      return snapshot.docs
-          .map((doc) => RouteModel.fromFirestore(doc))
-          .toList();
+      return snapshot.docs.map((doc) => RouteModel.fromFirestore(doc)).toList();
     } catch (e) {
       debugPrint('FirestoreService.getActiveRoutes error: $e');
       rethrow;
@@ -254,8 +254,11 @@ class FirestoreService {
     return _firestore
         .collection(FirebasePaths.routesCollection)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => RouteModel.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => RouteModel.fromFirestore(doc))
+              .toList(),
+        );
   }
 
   // ---------------------------------------------------------------------------
@@ -313,8 +316,9 @@ class FirestoreService {
   /// Retrieves all bus stops across the entire network.
   Future<List<StopModel>> getAllStops() async {
     try {
-      final snapshot =
-          await _firestore.collection(FirebasePaths.stopsCollection).get();
+      final snapshot = await _firestore
+          .collection(FirebasePaths.stopsCollection)
+          .get();
 
       return snapshot.docs.map((doc) => StopModel.fromFirestore(doc)).toList();
     } catch (e) {
@@ -335,8 +339,9 @@ class FirestoreService {
           .where('routeId', isEqualTo: routeId)
           .get();
 
-      final list =
-          snapshot.docs.map((doc) => StopTimeModel.fromFirestore(doc)).toList();
+      final list = snapshot.docs
+          .map((doc) => StopTimeModel.fromFirestore(doc))
+          .toList();
       list.sort((a, b) => a.scheduledArrival.compareTo(b.scheduledArrival));
       return list;
     } catch (e) {
@@ -353,8 +358,9 @@ class FirestoreService {
           .where('stopId', isEqualTo: stopId)
           .get();
 
-      final list =
-          snapshot.docs.map((doc) => StopTimeModel.fromFirestore(doc)).toList();
+      final list = snapshot.docs
+          .map((doc) => StopTimeModel.fromFirestore(doc))
+          .toList();
       list.sort((a, b) => a.scheduledArrival.compareTo(b.scheduledArrival));
       return list;
     } catch (e) {
@@ -389,8 +395,9 @@ class FirestoreService {
   /// `users/{uid}/commutePreferences/primary`.
   Future<CommutePreference?> getCommutePreference(String uid) async {
     try {
-      final doc =
-          await _firestore.doc(FirebasePaths.primaryCommutePreference(uid)).get();
+      final doc = await _firestore
+          .doc(FirebasePaths.primaryCommutePreference(uid))
+          .get();
       if (!doc.exists || doc.data() == null) return null;
       return CommutePreference.fromFirestore(doc);
     } catch (e) {
@@ -402,9 +409,11 @@ class FirestoreService {
   /// Saves or updates the commuter's primary preference document.
   Future<void> saveCommutePreference(CommutePreference preference) async {
     try {
-      await _commit(_firestore
-          .doc(FirebasePaths.primaryCommutePreference(preference.userId))
-          .set(preference.toFirestore(), SetOptions(merge: true)));
+      await _commit(
+        _firestore
+            .doc(FirebasePaths.primaryCommutePreference(preference.userId))
+            .set(preference.toFirestore(), SetOptions(merge: true)),
+      );
     } catch (e) {
       debugPrint('FirestoreService.saveCommutePreference error: $e');
       rethrow;
@@ -412,15 +421,20 @@ class FirestoreService {
   }
 
   /// Saves only the home pin onto the commuter's primary preference.
-  Future<void> saveHomePin(String uid, double latitude, double longitude) async {
+  Future<void> saveHomePin(
+    String uid,
+    double latitude,
+    double longitude,
+  ) async {
     try {
       await _commit(
-          _firestore.doc(FirebasePaths.primaryCommutePreference(uid)).set({
-        'userId': uid,
-        'homeLatitude': latitude,
-        'homeLongitude': longitude,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true)));
+        _firestore.doc(FirebasePaths.primaryCommutePreference(uid)).set({
+          'userId': uid,
+          'homeLatitude': latitude,
+          'homeLongitude': longitude,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true)),
+      );
     } catch (e) {
       debugPrint('FirestoreService.saveHomePin error ($uid): $e');
       rethrow;
@@ -430,7 +444,9 @@ class FirestoreService {
   /// Deletes the commuter's saved preference (home pin and commute).
   Future<void> deleteCommutePreference(String uid) async {
     try {
-      await _firestore.doc(FirebasePaths.primaryCommutePreference(uid)).delete();
+      await _firestore
+          .doc(FirebasePaths.primaryCommutePreference(uid))
+          .delete();
     } catch (e) {
       debugPrint('FirestoreService.deleteCommutePreference error ($uid): $e');
       rethrow;
@@ -466,10 +482,11 @@ class FirestoreService {
   Future<void> cancelAlertSession(String sessionId) async {
     try {
       await _commit(
-          _firestore.doc(FirebasePaths.alertSession(sessionId)).update({
-        'status': AlertSessionStatus.cancelled.toValue(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }));
+        _firestore.doc(FirebasePaths.alertSession(sessionId)).update({
+          'status': AlertSessionStatus.cancelled.toValue(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }),
+      );
     } catch (e) {
       debugPrint('FirestoreService.cancelAlertSession error ($sessionId): $e');
       rethrow;
@@ -479,17 +496,24 @@ class FirestoreService {
   /// Updates an alert session document.
   Future<void> updateAlertSession(AlertSession session) async {
     try {
-      await _commit(_firestore
-          .doc(FirebasePaths.alertSession(session.id))
-          .set(session.toFirestore(), SetOptions(merge: true)));
+      await _commit(
+        _firestore
+            .doc(FirebasePaths.alertSession(session.id))
+            .set(session.toFirestore(), SetOptions(merge: true)),
+      );
     } catch (e) {
-      debugPrint('FirestoreService.updateAlertSession error (${session.id}): $e');
+      debugPrint(
+        'FirestoreService.updateAlertSession error (${session.id}): $e',
+      );
       rethrow;
     }
   }
 
   /// Real-time stream of the commuter's active alert session for [serviceDate].
-  Stream<AlertSession?> streamActiveAlertSession(String uid, String serviceDate) {
+  Stream<AlertSession?> streamActiveAlertSession(
+    String uid,
+    String serviceDate,
+  ) {
     return _firestore
         .collection(FirebasePaths.alertSessionsCollection)
         .where('commuterUid', isEqualTo: uid)
@@ -498,9 +522,9 @@ class FirestoreService {
         .limit(1)
         .snapshots()
         .map((snapshot) {
-      if (snapshot.docs.isEmpty) return null;
-      return AlertSession.fromFirestore(snapshot.docs.first);
-    });
+          if (snapshot.docs.isEmpty) return null;
+          return AlertSession.fromFirestore(snapshot.docs.first);
+        });
   }
 
   // ---------------------------------------------------------------------------
@@ -523,16 +547,14 @@ class FirestoreService {
           .toList();
     } catch (e) {
       debugPrint(
-          'FirestoreService.getAssignmentsForOperator error ($operatorUid): $e');
+        'FirestoreService.getAssignmentsForOperator error ($operatorUid): $e',
+      );
       rethrow;
     }
   }
 
   /// Checks if a designated operator is authorized to track a given bus.
-  Future<bool> isOperatorAssignedToBus(
-    String operatorUid,
-    String busId,
-  ) async {
+  Future<bool> isOperatorAssignedToBus(String operatorUid, String busId) async {
     try {
       final snapshot = await _firestore
           .collection(FirebasePaths.operatorAssignmentsCollection)
@@ -553,7 +575,8 @@ class FirestoreService {
       return false;
     } catch (e) {
       debugPrint(
-          'FirestoreService.isOperatorAssignedToBus error ($operatorUid, $busId): $e');
+        'FirestoreService.isOperatorAssignedToBus error ($operatorUid, $busId): $e',
+      );
       return false;
     }
   }
@@ -576,7 +599,8 @@ class FirestoreService {
       return OperatorAssignmentModel.fromFirestore(snapshot.docs.first);
     } catch (e) {
       debugPrint(
-          'FirestoreService.getAssignment error ($busId, $operatorUid): $e');
+        'FirestoreService.getAssignment error ($busId, $operatorUid): $e',
+      );
       rethrow;
     }
   }

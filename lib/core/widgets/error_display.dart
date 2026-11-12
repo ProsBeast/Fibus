@@ -54,7 +54,7 @@ class ErrorDisplay extends StatelessWidget {
                         onPressed: onRetry,
                         style: TextButton.styleFrom(
                           padding: EdgeInsets.zero,
-                          minimumSize: const Size(0, 32),
+                          minimumSize: const Size(0, 44),
                         ),
                         child: Text(retryLabel),
                       ),
@@ -75,12 +75,17 @@ class ErrorDisplay extends StatelessWidget {
           children: [
             Icon(icon ?? Icons.error_outline, size: 28, color: c.textMuted),
             const SizedBox(height: FibusSpace.s16),
-            Text(title ?? 'Something went wrong',
-                style: t.titleMedium, textAlign: TextAlign.center),
+            Text(
+              title ?? 'Something went wrong',
+              style: t.titleMedium,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: FibusSpace.s8),
-            Text(message,
-                style: t.bodyMedium?.copyWith(color: c.textSecondary),
-                textAlign: TextAlign.center),
+            Text(
+              message,
+              style: t.bodyMedium?.copyWith(color: c.textSecondary),
+              textAlign: TextAlign.center,
+            ),
             if (onRetry != null) ...[
               const SizedBox(height: FibusSpace.s24),
               OutlinedButton(onPressed: onRetry, child: Text(retryLabel)),
@@ -88,8 +93,9 @@ class ErrorDisplay extends StatelessWidget {
             if (onSecondaryAction != null && secondaryActionLabel != null) ...[
               const SizedBox(height: FibusSpace.s8),
               TextButton(
-                  onPressed: onSecondaryAction,
-                  child: Text(secondaryActionLabel!)),
+                onPressed: onSecondaryAction,
+                child: Text(secondaryActionLabel!),
+              ),
             ],
           ],
         ),

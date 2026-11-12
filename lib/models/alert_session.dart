@@ -91,7 +91,8 @@ class AlertSession {
       status == AlertSessionStatus.leaveNowSent;
 
   factory AlertSession.fromFirestore(
-      DocumentSnapshot<Map<String, dynamic>> snapshot) {
+    DocumentSnapshot<Map<String, dynamic>> snapshot,
+  ) {
     final data = snapshot.data() ?? {};
     return AlertSession.fromMap(data, snapshot.id);
   }
@@ -105,11 +106,15 @@ class AlertSession {
       busId: map['busId'] as String? ?? '',
       routeId: map['routeId'] as String? ?? '',
       boardingStopId: map['boardingStopId'] as String? ?? '',
-      status: AlertSessionStatus.fromValue(map['status'] as String? ?? 'inactive'),
-      recommendationVersion: (map['recommendationVersion'] as num?)?.toInt() ?? 1,
+      status: AlertSessionStatus.fromValue(
+        map['status'] as String? ?? 'inactive',
+      ),
+      recommendationVersion:
+          (map['recommendationVersion'] as num?)?.toInt() ?? 1,
       scheduledArrival: (map['scheduledArrival'] as Timestamp?)?.toDate(),
       busEta: (map['busEta'] as Timestamp?)?.toDate(),
-      scooterDurationSeconds: (map['scooterDurationSeconds'] as num?)?.toInt() ?? 600,
+      scooterDurationSeconds:
+          (map['scooterDurationSeconds'] as num?)?.toInt() ?? 600,
       safetyMarginSeconds: (map['safetyMarginSeconds'] as num?)?.toInt() ?? 120,
       recommendedLeaveBy: (map['recommendedLeaveBy'] as Timestamp?)?.toDate(),
       advanceNotificationStatus:

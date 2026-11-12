@@ -1,4 +1,5 @@
 import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:fibus/app/commuter_app.dart';
@@ -19,7 +20,10 @@ void main() async {
   try {
     await NotificationService.instance.initialize();
   } catch (e, stack) {
-    developer.log('NotificationService initialization notice: $e', stackTrace: stack);
+    developer.log(
+      'NotificationService initialization notice: $e',
+      stackTrace: stack,
+    );
   }
 
   runApp(const CommuterApp());

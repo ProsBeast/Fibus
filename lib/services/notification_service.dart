@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -39,9 +40,7 @@ class NotificationService {
     FlutterLocalNotificationsPlugin? localNotifications,
     FirestoreService? firestoreService,
   }) {
-    if (fcm != null ||
-        localNotifications != null ||
-        firestoreService != null) {
+    if (fcm != null || localNotifications != null || firestoreService != null) {
       return NotificationService._internal(
         fcm: fcm,
         localNotifications: localNotifications,
@@ -55,10 +54,10 @@ class NotificationService {
     FirebaseMessaging? fcm,
     FlutterLocalNotificationsPlugin? localNotifications,
     FirestoreService? firestoreService,
-  })  : _fcm = fcm ?? FirebaseMessaging.instance,
-        _localNotifications =
-            localNotifications ?? FlutterLocalNotificationsPlugin(),
-        _firestoreService = firestoreService ?? FirestoreService();
+  }) : _fcm = fcm ?? FirebaseMessaging.instance,
+       _localNotifications =
+           localNotifications ?? FlutterLocalNotificationsPlugin(),
+       _firestoreService = firestoreService ?? FirestoreService();
 
   // ---------------------------------------------------------------------------
   // Getters
@@ -106,9 +105,7 @@ class NotificationService {
         sound: true,
       );
 
-      debugPrint(
-        'FCM authorization status: ${settings.authorizationStatus}',
-      );
+      debugPrint('FCM authorization status: ${settings.authorizationStatus}');
 
       // 2. Configure Flutter Local Notifications Plugin
       const AndroidInitializationSettings androidSettings =
@@ -116,10 +113,10 @@ class NotificationService {
 
       const DarwinInitializationSettings iosSettings =
           DarwinInitializationSettings(
-        requestAlertPermission: true,
-        requestBadgePermission: true,
-        requestSoundPermission: true,
-      );
+            requestAlertPermission: true,
+            requestBadgePermission: true,
+            requestSoundPermission: true,
+          );
 
       const InitializationSettings initSettings = InitializationSettings(
         android: androidSettings,
@@ -186,7 +183,8 @@ class NotificationService {
       title: title,
       body: body,
       payload: message.data['route'] ?? message.data['payload'],
-      channelId: message.data['channelId'] ?? AppConstants.departureAlertChannelId,
+      channelId:
+          message.data['channelId'] ?? AppConstants.departureAlertChannelId,
     );
   }
 
@@ -260,9 +258,10 @@ class NotificationService {
   /// Whether the app is currently allowed to post notifications.
   Future<bool> areNotificationsEnabled() async {
     try {
-      final androidPlugin =
-          _localNotifications.resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
+      final androidPlugin = _localNotifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       if (androidPlugin != null) {
         return await androidPlugin.areNotificationsEnabled() ?? false;
       }
@@ -329,9 +328,10 @@ class NotificationService {
     required String body,
   }) async {
     try {
-      final androidPlugin =
-          _localNotifications.resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
+      final androidPlugin = _localNotifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       final exact =
           await androidPlugin?.canScheduleExactNotifications() ?? false;
       await _localNotifications.zonedSchedule(
@@ -422,9 +422,10 @@ class NotificationService {
   // ---------------------------------------------------------------------------
 
   Future<void> _createAndroidNotificationChannels() async {
-    final androidPlugin =
-        _localNotifications.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = _localNotifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
 
     if (androidPlugin == null) return;
 

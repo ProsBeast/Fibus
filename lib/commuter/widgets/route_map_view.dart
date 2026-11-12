@@ -37,7 +37,8 @@ class RouteMapView extends StatelessWidget {
     final c = context.fib;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final polyline = route?.polylinePoints ?? const <LatLng>[];
-    final hasBus = liveBus != null && liveBus!.hasValidLocation && !liveBus!.isOffline;
+    final hasBus =
+        liveBus != null && liveBus!.hasValidLocation && !liveBus!.isOffline;
     final busLive = liveBus?.isLive ?? false;
 
     return Semantics(
@@ -53,57 +54,70 @@ class RouteMapView extends StatelessWidget {
           options: MapOptions(
             initialCenter: _initialCenter,
             initialZoom: 13.5,
-            interactionOptions:
-                const InteractionOptions(flags: InteractiveFlag.none),
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.none,
+            ),
           ),
           children: [
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.fibus.commuter',
               tileBuilder: (context, tile, _) => ColorFiltered(
-                colorFilter:
-                    ColorFilter.matrix(isDark ? MapTiles.dark : MapTiles.quiet),
+                colorFilter: ColorFilter.matrix(
+                  isDark ? MapTiles.dark : MapTiles.quiet,
+                ),
                 child: tile,
               ),
             ),
             if (polyline.isNotEmpty)
-              PolylineLayer(polylines: [
-                Polyline(
-                  points: polyline,
-                  color: c.textPrimary.withValues(alpha: 0.8),
-                  strokeWidth: 3,
-                ),
-              ]),
-            MarkerLayer(markers: [
-              if (stop != null)
-                Marker(
-                  point: stop!.location,
-                  width: 20,
-                  height: 20,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: c.surface,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: c.textPrimary, width: 3),
+              PolylineLayer(
+                polylines: [
+                  Polyline(
+                    points: polyline,
+                    color: c.textPrimary.withValues(alpha: 0.8),
+                    strokeWidth: 3,
+                  ),
+                ],
+              ),
+            const OsmAttribution(),
+            MarkerLayer(
+              markers: [
+                if (stop != null)
+                  Marker(
+                    point: stop!.location,
+                    width: 20,
+                    height: 20,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: c.surface,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: c.textPrimary, width: 3),
+                      ),
                     ),
                   ),
-                ),
-              if (hasBus)
-                Marker(
-                  point: liveBus!.location,
-                  width: 32,
-                  height: 28,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: busLive ? c.accent : c.surface,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: c.accent, width: busLive ? 0 : 2),
+                if (hasBus)
+                  Marker(
+                    point: liveBus!.location,
+                    width: 32,
+                    height: 28,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: busLive ? c.accent : c.surface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: c.accent,
+                          width: busLive ? 0 : 2,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.directions_bus_outlined,
+                        size: 18,
+                        color: busLive ? c.onAccent : c.accentInk,
+                      ),
                     ),
-                    child: Icon(Icons.directions_bus_outlined,
-                        size: 18, color: busLive ? c.onAccent : c.accentInk),
                   ),
-                ),
-            ]),
+              ],
+            ),
           ],
         ),
       ),

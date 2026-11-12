@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
@@ -65,7 +66,8 @@ class _ActiveTrackingScreenState extends State<ActiveTrackingScreen> {
       builder: (dialogCtx) => AlertDialog(
         title: const Text('End this trip'),
         content: const Text(
-            'Riders stop seeing the bus and fall back to the timetable'),
+          'Riders stop seeing the bus and fall back to the timetable',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogCtx).pop(false),
@@ -144,175 +146,228 @@ class _ActiveTrackingScreenState extends State<ActiveTrackingScreen> {
           ),
           title: Text(_bus?.displayName ?? 'Tracking'),
         ),
-        body: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                  FibusSpace.page, FibusSpace.s8, FibusSpace.page, FibusSpace.s16),
-              child: Semantics(
-                liveRegion: true,
-                child: Row(
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: sharing ? c.positive : null,
-                        border: sharing
-                            ? null
-                            : Border.all(color: c.textMuted, width: 1.5),
-                      ),
+        // The map fills the space left under the status. With very large
+        // text or a short screen the page scrolls instead of overflowing;
+        // otherwise scrolling is off so the map keeps all its gestures.
+        body: LayoutBuilder(
+          builder: (context, box) {
+            final scale = MediaQuery.textScalerOf(context).scale(1);
+            final room = box.maxHeight - 284 * scale;
+            final fits = room >= 240;
+            return SingleChildScrollView(
+              physics: fits ? const NeverScrollableScrollPhysics() : null,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      FibusSpace.page,
+                      FibusSpace.s8,
+                      FibusSpace.page,
+                      FibusSpace.s16,
                     ),
-                    const SizedBox(width: FibusSpace.s12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Row(
                         children: [
-                          Text(status, style: t.titleLarge),
-                          if (statusDetail != null)
-                            Text(statusDetail, style: t.bodySmall),
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: sharing ? c.positive : null,
+                              border: sharing
+                                  ? null
+                                  : Border.all(color: c.textMuted, width: 1.5),
+                            ),
+                          ),
+                          const SizedBox(width: FibusSpace.s12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(status, style: t.titleLarge),
+                                if (statusDetail != null)
+                                  Text(statusDetail, style: t.bodySmall),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: FibusSpace.page),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _Figure(
-                        label: 'Speed',
-                        value: tracking.speedKmh.toStringAsFixed(0),
-                        unit: 'km/h'),
                   ),
-                  Expanded(
-                    child: _Figure(
-                        label: 'On trip', value: tracking.sessionDurationFormatted),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: FibusSpace.s16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: FibusSpace.page),
-              child: GpsHealthIndicator(
-                accuracy: tracking.accuracy,
-                fixCount: tracking.fixCount,
-                lastFixTime: tracking.lastFixTime,
-                isTracking: tracking.isTracking,
-              ),
-            ),
-            const SizedBox(height: FibusSpace.s16),
-            Expanded(
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: FibusSpace.page),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(FibusSpace.radiusCard),
-                  border: Border.all(color: c.hairline),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Stack(
-                  children: [
-                    FlutterMap(
-                      mapController: _mapController,
-                      options: MapOptions(
-                        initialCenter: here,
-                        initialZoom: 15.5,
-                        onPositionChanged: (_, hasGesture) {
-                          if (hasGesture && _autoCenter) {
-                            setState(() => _autoCenter = false);
-                          }
-                        },
-                      ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: FibusSpace.page,
+                    ),
+                    child: Row(
                       children: [
-                        TileLayer(
-                          urlTemplate:
-                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          userAgentPackageName: 'com.fibus.tracker',
-                          tileBuilder: (context, tile, _) => ColorFiltered(
-                            colorFilter: ColorFilter.matrix(
-                                isDark ? MapTiles.dark : MapTiles.quiet),
-                            child: tile,
+                        Expanded(
+                          child: _Figure(
+                            label: 'Speed',
+                            value: tracking.speedKmh.toStringAsFixed(0),
+                            unit: 'km/h',
                           ),
                         ),
-                        if (_route != null && _route!.polylinePoints.isNotEmpty)
-                          PolylineLayer(polylines: [
-                            Polyline(
-                              points: _route!.polylinePoints,
-                              color: c.textPrimary.withValues(alpha: 0.7),
-                              strokeWidth: 3,
+                        Expanded(
+                          child: _Figure(
+                            label: 'On trip',
+                            value: tracking.sessionDurationFormatted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: FibusSpace.s16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: FibusSpace.page,
+                    ),
+                    child: GpsHealthIndicator(
+                      accuracy: tracking.accuracy,
+                      fixCount: tracking.fixCount,
+                      lastFixTime: tracking.lastFixTime,
+                      isTracking: tracking.isTracking,
+                    ),
+                  ),
+                  const SizedBox(height: FibusSpace.s16),
+                  SizedBox(
+                    height: fits ? room : 240,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: FibusSpace.page,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(
+                          FibusSpace.radiusCard,
+                        ),
+                        border: Border.all(color: c.hairline),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Stack(
+                        children: [
+                          FlutterMap(
+                            mapController: _mapController,
+                            options: MapOptions(
+                              initialCenter: here,
+                              initialZoom: 15.5,
+                              onPositionChanged: (_, hasGesture) {
+                                if (hasGesture && _autoCenter) {
+                                  setState(() => _autoCenter = false);
+                                }
+                              },
                             ),
-                          ]),
-                        if (pos != null)
-                          MarkerLayer(markers: [
-                            Marker(
-                              point: here,
-                              width: 36,
-                              height: 36,
-                              child: Transform.rotate(
-                                angle: pos.heading * math.pi / 180,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: c.accent,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: c.surface, width: 3),
+                            children: [
+                              TileLayer(
+                                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                userAgentPackageName: 'com.fibus.tracker',
+                                tileBuilder: (context, tile, _) =>
+                                    ColorFiltered(
+                                      colorFilter: ColorFilter.matrix(
+                                        isDark ? MapTiles.dark : MapTiles.quiet,
+                                      ),
+                                      child: tile,
+                                    ),
+                              ),
+                              if (_route != null &&
+                                  _route!.polylinePoints.isNotEmpty)
+                                PolylineLayer(
+                                  polylines: [
+                                    Polyline(
+                                      points: _route!.polylinePoints,
+                                      color: c.textPrimary.withValues(
+                                        alpha: 0.7,
+                                      ),
+                                      strokeWidth: 3,
+                                    ),
+                                  ],
+                                ),
+                              const OsmAttribution(),
+                              if (pos != null)
+                                MarkerLayer(
+                                  markers: [
+                                    Marker(
+                                      point: here,
+                                      width: 36,
+                                      height: 36,
+                                      child: Transform.rotate(
+                                        angle: pos.heading * math.pi / 180,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: c.accent,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: c.surface,
+                                              width: 3,
+                                            ),
+                                          ),
+                                          child: Icon(
+                                            Icons.navigation_outlined,
+                                            size: 18,
+                                            color: c.onAccent,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                            ],
+                          ),
+                          if (!_autoCenter)
+                            Positioned(
+                              right: FibusSpace.s12,
+                              bottom: FibusSpace.s12,
+                              child: Material(
+                                color: c.surface,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    FibusSpace.radiusControl,
                                   ),
-                                  child: Icon(Icons.navigation_outlined,
-                                      size: 18, color: c.onAccent),
+                                  side: BorderSide(color: c.hairline),
+                                ),
+                                child: IconButton(
+                                  tooltip: 'Follow the bus',
+                                  icon: const Icon(Icons.my_location),
+                                  onPressed: () {
+                                    setState(() => _autoCenter = true);
+                                    _mapController.move(here, 16);
+                                  },
                                 ),
                               ),
                             ),
-                          ]),
-                      ],
-                    ),
-                    if (!_autoCenter)
-                      Positioned(
-                        right: FibusSpace.s12,
-                        bottom: FibusSpace.s12,
-                        child: Material(
-                          color: c.surface,
-                          shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(FibusSpace.radiusControl),
-                            side: BorderSide(color: c.hairline),
-                          ),
-                          child: IconButton(
-                            tooltip: 'Follow the bus',
-                            icon: const Icon(Icons.my_location),
-                            onPressed: () {
-                              setState(() => _autoCenter = true);
-                              _mapController.move(here, 16);
-                            },
-                          ),
-                        ),
+                        ],
                       ),
-                  ],
-                ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+            );
+          },
         ),
         bottomNavigationBar: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
-                FibusSpace.page, FibusSpace.s12, FibusSpace.page, FibusSpace.s12),
+              FibusSpace.page,
+              FibusSpace.s12,
+              FibusSpace.page,
+              FibusSpace.s12,
+            ),
             child: finished
                 ? FilledButton(
                     onPressed: () async {
                       // Clears local trip state after a takeover.
-                      if (lifecycle.isActive) await lifecycle.stopTrip(widget.busId);
+                      if (lifecycle.isActive)
+                        await lifecycle.stopTrip(widget.busId);
                       if (context.mounted) context.go('/buses');
                     },
                     child: const Text('Back to buses'),
                   )
                 : OutlinedButton(
-                    onPressed:
-                        lifecycle.isProcessing ? null : _confirmStopTracking,
-                    style: OutlinedButton.styleFrom(foregroundColor: c.negative),
+                    onPressed: lifecycle.isProcessing
+                        ? null
+                        : _confirmStopTracking,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: c.negative,
+                    ),
                     child: Text(lifecycle.isProcessing ? 'Ending' : 'End trip'),
                   ),
           ),
@@ -340,12 +395,24 @@ class _Figure extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
-            Text(value,
-                style: FibusType.figure(context, size: 32, weight: FontWeight.w500)),
+            Text(
+              value,
+              style: FibusType.figure(
+                context,
+                size: 32,
+                weight: FontWeight.w500,
+              ),
+            ),
             if (unit != null) ...[
               const SizedBox(width: FibusSpace.s4),
-              Text(unit!,
-                  style: FibusType.figure(context, size: 14, color: c.textSecondary)),
+              Text(
+                unit!,
+                style: FibusType.figure(
+                  context,
+                  size: 14,
+                  color: c.textSecondary,
+                ),
+              ),
             ],
           ],
         ),

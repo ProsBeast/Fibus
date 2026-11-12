@@ -76,9 +76,7 @@ class _CommuterAppState extends State<CommuterApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider<AuthService>.value(
-          value: AuthService.instance,
-        ),
+        ChangeNotifierProvider<AuthService>.value(value: AuthService.instance),
         ChangeNotifierProvider<CommuteProvider>(
           create: (_) => CommuteProvider(),
         ),
@@ -92,6 +90,7 @@ class _CommuterAppState extends State<CommuterApp> {
       child: MaterialApp.router(
         title: 'Fibus Commuter',
         debugShowCheckedModeBanner: false,
+        builder: FibusSystemBars.builder,
         theme: FibusTheme.light,
         darkTheme: FibusTheme.dark,
         themeMode: ThemeMode.system,

@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
@@ -56,7 +57,7 @@ class LocationService extends ChangeNotifier {
   }
 
   LocationService._internal({RealtimeDbService? rtdbService})
-      : _rtdbService = rtdbService ?? RealtimeDbService();
+    : _rtdbService = rtdbService ?? RealtimeDbService();
 
   // ---------------------------------------------------------------------------
   // Getters
@@ -144,20 +145,20 @@ class LocationService extends ChangeNotifier {
         );
       }
 
-      _positionSubscription = Geolocator.getPositionStream(
-        locationSettings: locationSettings,
-      ).listen(
-        (Position position) => _onLocationReceived(
-          position: position,
-          busId: busId,
-          sessionGeneration: sessionGeneration,
-        ),
-        onError: (dynamic error) {
-          _lastError = 'Location stream error: $error';
-          debugPrint(_lastError);
-          notifyListeners();
-        },
-      );
+      _positionSubscription =
+          Geolocator.getPositionStream(locationSettings: locationSettings)
+              .listen(
+                (Position position) => _onLocationReceived(
+                  position: position,
+                  busId: busId,
+                  sessionGeneration: sessionGeneration,
+                ),
+                onError: (dynamic error) {
+                  _lastError = 'Location stream error: $error';
+                  debugPrint(_lastError);
+                  notifyListeners();
+                },
+              );
 
       _isTracking = true;
       _activeBusId = busId;
@@ -209,8 +210,12 @@ class LocationService extends ChangeNotifier {
     final last = _lastPublishedPosition;
     final moved = last == null
         ? double.infinity
-        : Geolocator.distanceBetween(last.latitude, last.longitude,
-            position.latitude, position.longitude);
+        : Geolocator.distanceBetween(
+            last.latitude,
+            last.longitude,
+            position.latitude,
+            position.longitude,
+          );
     if (!shouldPublishFix(
       movedMeters: moved,
       sinceLastPublish: _lastPublishAttemptAt == null
@@ -275,7 +280,8 @@ class LocationService extends ChangeNotifier {
   Future<void> _ensureLocationPermissions() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       throw const LocationSetupException(
-          'Location is turned off. Turn it on in quick settings and try again');
+        'Location is turned off. Turn it on in quick settings and try again',
+      );
     }
 
     var permission = await Geolocator.checkPermission();
@@ -284,12 +290,14 @@ class LocationService extends ChangeNotifier {
     }
     if (permission == LocationPermission.denied) {
       throw const LocationSetupException(
-          'Fibus Tracker needs location permission to share the bus');
+        'Fibus Tracker needs location permission to share the bus',
+      );
     }
     if (permission == LocationPermission.deniedForever) {
       throw const LocationSetupException(
-          'Location permission is blocked. Allow it for Fibus Tracker in '
-          'Android settings');
+        'Location permission is blocked. Allow it for Fibus Tracker in '
+        'Android settings',
+      );
     }
 
     // The foreground-service notification needs this on Android 13+.

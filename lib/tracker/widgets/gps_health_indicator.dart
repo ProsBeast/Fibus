@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:fibus/core/theme/fibus_palette.dart';
 import 'package:fibus/core/theme/fibus_theme.dart';
@@ -68,23 +69,32 @@ class _GpsHealthIndicatorState extends State<GpsHealthIndicator> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_quality(age),
-              style: context.type.titleSmall
-                  ?.copyWith(color: bad && widget.isTracking ? c.accentInk : null)),
+          Text(
+            _quality(age),
+            style: context.type.titleSmall?.copyWith(
+              color: bad && widget.isTracking ? c.accentInk : null,
+            ),
+          ),
           const SizedBox(height: FibusSpace.s12),
           Row(
             children: [
               Expanded(
                 child: _Meta(
-                    label: 'Accuracy',
-                    value: widget.lastFixTime == null
-                        ? '--'
-                        : '±${widget.accuracy.toStringAsFixed(0)} m'),
+                  label: 'Accuracy',
+                  value: widget.lastFixTime == null
+                      ? '--'
+                      : '±${widget.accuracy.toStringAsFixed(0)} m',
+                ),
               ),
               Expanded(
-                child: _Meta(label: 'Last fix', value: age == null ? '--' : '$age s ago'),
+                child: _Meta(
+                  label: 'Last fix',
+                  value: age == null ? '--' : '$age s ago',
+                ),
               ),
-              Expanded(child: _Meta(label: 'Sent', value: '${widget.fixCount}')),
+              Expanded(
+                child: _Meta(label: 'Sent', value: '${widget.fixCount}'),
+              ),
             ],
           ),
         ],

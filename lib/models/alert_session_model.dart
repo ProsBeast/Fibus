@@ -77,7 +77,9 @@ class AlertSessionModel {
   ]) {
     final data = snapshot.data();
     if (data == null) {
-      throw StateError('Cannot create AlertSessionModel from empty document snapshot');
+      throw StateError(
+        'Cannot create AlertSessionModel from empty document snapshot',
+      );
     }
     return AlertSessionModel.fromMap(data, id: snapshot.id);
   }
@@ -121,7 +123,8 @@ class AlertSessionModel {
       busEtaSeconds: (map['busEtaSeconds'] as num?)?.toInt(),
       createdAt: parsedCreated,
       updatedAt: parsedUpdated,
-      lastNotificationVersion: (map['lastNotificationVersion'] as num?)?.toInt() ?? 0,
+      lastNotificationVersion:
+          (map['lastNotificationVersion'] as num?)?.toInt() ?? 0,
     );
   }
 

@@ -59,7 +59,9 @@ class BusEtaCard extends StatelessWidget {
     final age = liveBus?.ageSinceLastUpdate;
     switch (etaStatus) {
       case LiveEtaStatus.live:
-        return age == null ? 'From live GPS' : 'From live GPS, ${age.inSeconds} s ago';
+        return age == null
+            ? 'From live GPS'
+            : 'From live GPS, ${age.inSeconds} s ago';
       case LiveEtaStatus.warmingUp:
         return 'Tracking just started. Using the timetable for now';
       case LiveEtaStatus.stale:
@@ -82,13 +84,16 @@ class BusEtaCard extends StatelessWidget {
     final stopName = stop?.name.isNotEmpty == true ? stop!.name : 'your stop';
     final eta = busEta == null ? null : splitTime(busEta!);
     final until = busEta?.difference(DateTime.now());
-    final boardingIndex =
-        stop == null ? -1 : stopNames.indexWhere((n) => n == stop!.name);
+    final boardingIndex = stop == null
+        ? -1
+        : stopNames.indexWhere((n) => n == stop!.name);
 
     String? drift;
     if (etaStatus == LiveEtaStatus.live) {
-      if (delayMinutes >= 5) drift = 'Running $delayMinutes min late vs timetable';
-      if (delayMinutes <= -3) drift = 'Running ${-delayMinutes} min early vs timetable';
+      if (delayMinutes >= 5)
+        drift = 'Running $delayMinutes min late vs timetable';
+      if (delayMinutes <= -3)
+        drift = 'Running ${-delayMinutes} min early vs timetable';
     }
 
     return FibCard(
@@ -99,7 +104,9 @@ class BusEtaCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  bus?.displayName.isNotEmpty == true ? bus!.displayName : 'Your bus',
+                  bus?.displayName.isNotEmpty == true
+                      ? bus!.displayName
+                      : 'Your bus',
                   style: t.titleSmall,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -110,48 +117,67 @@ class BusEtaCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: FibusSpace.s16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Column(
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.end,
+              spacing: FibusSpace.s16,
+              runSpacing: FibusSpace.s4,
+              children: [
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       busEta == null ||
                               relativeDayLabel(busEta!, DateTime.now()).isEmpty
                           ? 'Reaches $stopName'
                           : 'Reaches $stopName '
-                              '${relativeDayLabel(busEta!, DateTime.now())}',
+                                '${relativeDayLabel(busEta!, DateTime.now())}',
                       style: t.labelMedium,
                     ),
                     const SizedBox(height: FibusSpace.s4),
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.baseline,
                       textBaseline: TextBaseline.alphabetic,
                       children: [
-                        Text(eta?.clock ?? '--:--',
-                            style: FibusType.figure(context,
-                                size: 28, weight: FontWeight.w500)),
+                        Text(
+                          eta?.clock ?? '--:--',
+                          style: FibusType.figure(
+                            context,
+                            size: 28,
+                            weight: FontWeight.w500,
+                          ),
+                        ),
                         if (eta != null) ...[
                           const SizedBox(width: FibusSpace.s4),
-                          Text(eta.meridiem,
-                              style: FibusType.figure(context,
-                                  size: 14, color: c.textSecondary)),
+                          Text(
+                            eta.meridiem,
+                            style: FibusType.figure(
+                              context,
+                              size: 14,
+                              color: c.textSecondary,
+                            ),
+                          ),
                         ],
                       ],
                     ),
                   ],
                 ),
-              ),
-              if (until != null)
-                Text(
-                  until.isNegative ? 'Due now' : 'in ${formatDuration(until)}',
-                  style: t.bodySmall,
-                ),
-            ],
+                if (until != null)
+                  Text(
+                    until.isNegative
+                        ? 'Due now'
+                        : 'in ${formatDuration(until)}',
+                    style: t.bodySmall,
+                  ),
+              ],
+            ),
           ),
-          if (boardingIndex >= 0 && stopFractions.length == stopNames.length) ...[
+          if (boardingIndex >= 0 &&
+              stopFractions.length == stopNames.length) ...[
             const SizedBox(height: FibusSpace.s16),
             RouteStrip(
               stopNames: stopNames,
@@ -165,7 +191,10 @@ class BusEtaCard extends StatelessWidget {
           if (drift != null)
             Padding(
               padding: const EdgeInsets.only(bottom: FibusSpace.s4),
-              child: Text(drift, style: t.bodySmall?.copyWith(color: c.accentInk)),
+              child: Text(
+                drift,
+                style: t.bodySmall?.copyWith(color: c.accentInk),
+              ),
             ),
           Text(_source(), style: t.labelSmall),
         ],

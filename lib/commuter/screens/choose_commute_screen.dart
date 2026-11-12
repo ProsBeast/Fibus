@@ -11,6 +11,7 @@ import 'package:fibus/models/bus_model.dart';
 import 'package:fibus/models/route_model.dart';
 import 'package:fibus/models/stop_model.dart';
 import 'package:fibus/services/firestore_service.dart';
+import 'package:fibus/services/service_calendar.dart';
 
 /// Choose route, bus, boarding stop and the advance-warning lead time.
 class ChooseCommuteScreen extends StatefulWidget {
@@ -33,8 +34,8 @@ class _ChooseCommuteScreenState extends State<ChooseCommuteScreen> {
   RouteModel? _selectedRoute;
   BusModel? _selectedBus;
   StopModel? _selectedStop;
-  double _advanceWarningMinutes =
-      AppConstants.defaultAdvanceWarningMinutes.toDouble();
+  double _advanceWarningMinutes = AppConstants.defaultAdvanceWarningMinutes
+      .toDouble();
   String? _loadError;
 
   @override
@@ -56,7 +57,8 @@ class _ChooseCommuteScreenState extends State<ChooseCommuteScreen> {
         _advanceWarningMinutes = saved.advanceWarningMinutes.toDouble();
       }
       if (_routes.isEmpty) {
-        _loadError = 'No bus routes are set up yet. Ask your Fibus admin to add yours';
+        _loadError =
+            'No bus routes are set up yet. Ask your Fibus admin to add yours';
       } else {
         _selectedRoute = _routes.firstWhere(
           (r) => r.id == saved?.routeId,
@@ -82,14 +84,21 @@ class _ChooseCommuteScreenState extends State<ChooseCommuteScreen> {
       _loadError = 'Could not load buses and stops for ${route.name}';
       return;
     }
-    final saved = mounted ? context.read<CommuteProvider>().currentPreference : null;
+    final saved = mounted
+        ? context.read<CommuteProvider>().currentPreference
+        : null;
     _selectedBus = _buses.isEmpty
         ? null
-        : _buses.firstWhere((b) => b.id == saved?.busId, orElse: () => _buses.first);
+        : _buses.firstWhere(
+            (b) => b.id == saved?.busId,
+            orElse: () => _buses.first,
+          );
     _selectedStop = _stops.isEmpty
         ? null
-        : _stops.firstWhere((st) => st.id == saved?.boardingStopId,
-            orElse: () => _stops.first);
+        : _stops.firstWhere(
+            (st) => st.id == saved?.boardingStopId,
+            orElse: () => _stops.first,
+          );
     if (_buses.isEmpty || _stops.isEmpty) {
       _loadError =
           '${route.name} has no ${_buses.isEmpty ? 'buses' : 'stops'} set up yet';
@@ -98,7 +107,9 @@ class _ChooseCommuteScreenState extends State<ChooseCommuteScreen> {
 
   Future<void> _saveCommute() async {
     final messenger = ScaffoldMessenger.of(context);
-    if (_selectedRoute == null || _selectedBus == null || _selectedStop == null) {
+    if (_selectedRoute == null ||
+        _selectedBus == null ||
+        _selectedStop == null) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Pick a route, bus and stop')),
       );
@@ -107,11 +118,11 @@ class _ChooseCommuteScreenState extends State<ChooseCommuteScreen> {
     setState(() => _isSaving = true);
     try {
       await context.read<CommuteProvider>().saveCommutePreference(
-            route: _selectedRoute!,
-            bus: _selectedBus!,
-            stop: _selectedStop!,
-            advanceWarningMinutes: _advanceWarningMinutes.round(),
-          );
+        route: _selectedRoute!,
+        bus: _selectedBus!,
+        stop: _selectedStop!,
+        advanceWarningMinutes: _advanceWarningMinutes.round(),
+      );
       if (mounted) context.go('/dashboard');
     } catch (_) {
       messenger.showSnackBar(
@@ -149,91 +160,99 @@ class _ChooseCommuteScreenState extends State<ChooseCommuteScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
           : !ready
-              ? ErrorDisplay(
-                  title: 'Nothing to choose yet',
-                  message: _loadError ?? 'No routes, buses or stops are set up',
-                  icon: Icons.directions_bus_outlined,
-                  onRetry: _loadCatalog,
-                )
-              : SafeArea(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(FibusSpace.page,
-                        FibusSpace.s8, FibusSpace.page, FibusSpace.s32),
+          ? ErrorDisplay(
+              title: 'Nothing to choose yet',
+              message: _loadError ?? 'No routes, buses or stops are set up',
+              icon: Icons.directions_bus_outlined,
+              onRetry: _loadCatalog,
+            )
+          : SafeArea(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  FibusSpace.page,
+                  FibusSpace.s8,
+                  FibusSpace.page,
+                  FibusSpace.s32,
+                ),
+                children: [
+                  const SectionLabel('Route'),
+                  const SizedBox(height: FibusSpace.s8),
+                  _OptionGroup(
                     children: [
-                      const SectionLabel('Route'),
-                      const SizedBox(height: FibusSpace.s8),
-                      _OptionGroup(children: [
-                        for (final r in _routes)
-                          _OptionRow(
-                            title: r.name,
-                            subtitle: r.id == _selectedRoute?.id
-                                ? '${_stops.length} stops'
-                                : null,
-                            selected: r.id == _selectedRoute?.id,
-                            onTap: () => _selectRoute(r),
-                          ),
-                      ]),
-                      const SizedBox(height: FibusSpace.s24),
-                      const SectionLabel('Bus'),
-                      const SizedBox(height: FibusSpace.s8),
-                      _OptionGroup(children: [
-                        for (final b in _buses)
-                          _OptionRow(
-                            title: b.displayName,
-                            selected: b.id == _selectedBus?.id,
-                            onTap: () => setState(() => _selectedBus = b),
-                          ),
-                      ]),
-                      const SizedBox(height: FibusSpace.s24),
-                      const SectionLabel('Where you get on'),
-                      const SizedBox(height: FibusSpace.s8),
-                      _StopLine(
-                        stops: _stops,
-                        selectedId: _selectedStop?.id,
-                        onSelect: (s) => setState(() => _selectedStop = s),
-                      ),
-                      const SizedBox(height: FibusSpace.s24),
-                      const SectionLabel('Heads-up before you leave'),
-                      const SizedBox(height: FibusSpace.s8),
-                      FibCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      for (final r in _routes)
+                        _OptionRow(
+                          title: r.name,
+                          subtitle: r.id == _selectedRoute?.id
+                              ? '${_stops.length} stops'
+                              : null,
+                          selected: r.id == _selectedRoute?.id,
+                          onTap: () => _selectRoute(r),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: FibusSpace.s24),
+                  const SectionLabel('Bus'),
+                  const SizedBox(height: FibusSpace.s8),
+                  _OptionGroup(
+                    children: [
+                      for (final b in _buses)
+                        _OptionRow(
+                          title: b.displayName,
+                          selected: b.id == _selectedBus?.id,
+                          onTap: () => setState(() => _selectedBus = b),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: FibusSpace.s24),
+                  const SectionLabel('Where you get on'),
+                  const SizedBox(height: FibusSpace.s8),
+                  _StopLine(
+                    stops: _stops,
+                    selectedId: _selectedStop?.id,
+                    onSelect: (s) => setState(() => _selectedStop = s),
+                  ),
+                  const SizedBox(height: FibusSpace.s24),
+                  const SectionLabel('Heads-up before you leave'),
+                  const SizedBox(height: FibusSpace.s8),
+                  FibCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text('First alert', style: t.bodyMedium),
-                                ),
-                                Text(
-                                  '${_advanceWarningMinutes.round()} min before',
-                                  style: FibusType.figure(context, size: 14),
-                                ),
-                              ],
-                            ),
-                            Slider(
-                              value: _advanceWarningMinutes,
-                              min: 5,
-                              max: 30,
-                              divisions: 5,
-                              label: '${_advanceWarningMinutes.round()} min',
-                              onChanged: (v) =>
-                                  setState(() => _advanceWarningMinutes = v),
+                            Expanded(
+                              child: Text('First alert', style: t.bodyMedium),
                             ),
                             Text(
-                              'Then a Leave now alert at your leave-by time',
-                              style: t.bodySmall,
+                              '${_advanceWarningMinutes.round()} min before',
+                              style: FibusType.figure(context, size: 14),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: FibusSpace.s32),
-                      FilledButton(
-                        onPressed: _isSaving ? null : _saveCommute,
-                        child: Text(_isSaving ? 'Saving' : 'Save commute'),
-                      ),
-                    ],
+                        Slider(
+                          value: _advanceWarningMinutes.clamp(5.0, 30.0),
+                          min: 5,
+                          max: 30,
+                          divisions: 5,
+                          label: '${_advanceWarningMinutes.round()} min',
+                          onChanged: (v) =>
+                              setState(() => _advanceWarningMinutes = v),
+                        ),
+                        Text(
+                          'Then a Leave now alert at your leave-by time',
+                          style: t.bodySmall,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: FibusSpace.s32),
+                  FilledButton(
+                    onPressed: _isSaving ? null : _saveCommute,
+                    child: Text(_isSaving ? 'Saving' : 'Save commute'),
+                  ),
+                ],
+              ),
+            ),
     );
   }
 }
@@ -291,7 +310,8 @@ class _OptionRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(title, style: context.type.bodyMedium),
-                    if (subtitle != null) Text(subtitle!, style: context.type.bodySmall),
+                    if (subtitle != null)
+                      Text(subtitle!, style: context.type.bodySmall),
                   ],
                 ),
               ),
@@ -329,59 +349,101 @@ class _StopLine extends StatelessWidget {
       child: Column(
         children: [
           for (var i = 0; i < stops.length; i++)
-            _row(context, c, stops[i], first: i == 0, last: i == stops.length - 1),
+            _row(
+              context,
+              c,
+              stops[i],
+              first: i == 0,
+              last: i == stops.length - 1,
+            ),
         ],
       ),
     );
   }
 
-  Widget _row(BuildContext context, FibusPalette c, StopModel s,
-      {required bool first, required bool last}) {
+  Widget _row(
+    BuildContext context,
+    FibusPalette c,
+    StopModel s, {
+    required bool first,
+    required bool last,
+  }) {
     final selected = s.id == selectedId;
     return Semantics(
       selected: selected,
       button: true,
-      label: '${s.name}, timetable ${s.scheduledArrivalLocalTime}',
+      label:
+          '${s.name}, timetable ${formatTimetable(s.scheduledArrivalLocalTime)}',
       child: ExcludeSemantics(
         child: InkWell(
           onTap: () => onSelect(s),
+          // Grows with large text instead of clipping; the route line
+          // stretches to the row height.
           child: Container(
-            height: 48,
+            constraints: const BoxConstraints(minHeight: 48),
             color: selected ? c.accentSoft : null,
             padding: const EdgeInsets.symmetric(horizontal: FibusSpace.s16),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 48,
-                  child: Text(s.scheduledArrivalLocalTime,
-                      style: FibusType.figure(context,
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 68),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        formatTimetable(s.scheduledArrivalLocalTime),
+                        style: FibusType.figure(
+                          context,
                           size: 13,
-                          color: selected ? c.textPrimary : c.textSecondary)),
-                ),
-                SizedBox(
-                  width: 24,
-                  height: 48,
-                  child: CustomPaint(
-                    painter: _TickPainter(
-                      first: first,
-                      last: last,
-                      selected: selected,
-                      line: c.textMuted.withValues(alpha: 0.4),
-                      ink: c.textPrimary,
-                      fill: c.surface,
+                          color: selected ? c.textPrimary : c.textSecondary,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: FibusSpace.s12),
-                Expanded(
-                  child: Text(s.name,
-                      style: context.type.bodyMedium?.copyWith(
-                          fontWeight: selected ? FontWeight.w500 : FontWeight.w400)),
-                ),
-                if (selected)
-                  Text('Your stop',
-                      style: context.type.labelMedium?.copyWith(color: c.accentInk)),
-              ],
+                  SizedBox(
+                    width: 24,
+                    child: CustomPaint(
+                      painter: _TickPainter(
+                        first: first,
+                        last: last,
+                        selected: selected,
+                        line: c.textMuted.withValues(alpha: 0.4),
+                        ink: c.textPrimary,
+                        fill: c.surface,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: FibusSpace.s12),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: FibusSpace.s12,
+                        ),
+                        child: Text(
+                          s.name,
+                          style: context.type.bodyMedium?.copyWith(
+                            fontWeight: selected
+                                ? FontWeight.w500
+                                : FontWeight.w400,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (selected)
+                    Center(
+                      child: Text(
+                        'Your stop',
+                        style: context.type.labelMedium?.copyWith(
+                          color: c.accentInk,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -410,26 +472,32 @@ class _TickPainter extends CustomPainter {
     final stroke = Paint()
       ..color = line
       ..strokeWidth = 2;
-    canvas.drawLine(Offset(cx, first ? cy : 0), Offset(cx, last ? cy : size.height), stroke);
+    canvas.drawLine(
+      Offset(cx, first ? cy : 0),
+      Offset(cx, last ? cy : size.height),
+      stroke,
+    );
     if (selected) {
       canvas.drawCircle(Offset(cx, cy), 7, Paint()..color = fill);
       canvas.drawCircle(
-          Offset(cx, cy),
-          7,
-          Paint()
-            ..color = ink
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2);
+        Offset(cx, cy),
+        7,
+        Paint()
+          ..color = ink
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
       canvas.drawCircle(Offset(cx, cy), 3, Paint()..color = ink);
     } else {
       canvas.drawCircle(Offset(cx, cy), 4, Paint()..color = fill);
       canvas.drawCircle(
-          Offset(cx, cy),
-          4,
-          Paint()
-            ..color = ink.withValues(alpha: 0.55)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.5);
+        Offset(cx, cy),
+        4,
+        Paint()
+          ..color = ink.withValues(alpha: 0.55)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
+      );
     }
   }
 

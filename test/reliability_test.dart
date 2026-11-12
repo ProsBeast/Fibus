@@ -77,6 +77,13 @@ void main() {
       expect(relativeDayLabel(DateTime(2026, 11, 12, 7, 41), now), 'tomorrow');
       expect(relativeDayLabel(DateTime(2026, 11, 16, 7, 41), now), 'Monday');
     });
+    test('timetable times use the 12-hour form shown on the dashboard', () {
+      expect(formatTimetable('07:59'), '7:59 am');
+      expect(formatTimetable('12:05'), '12:05 pm');
+      expect(formatTimetable('00:30'), '12:30 am');
+      expect(formatTimetable('18:00'), '6:00 pm');
+      expect(formatTimetable('soon'), 'soon');
+    });
     test('date key is zero padded', () {
       expect(serviceDateKey(DateTime(2026, 3, 5, 23, 59)), '2026-03-05');
     });

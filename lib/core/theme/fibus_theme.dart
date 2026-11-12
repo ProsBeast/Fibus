@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fibus/core/theme/fibus_palette.dart';
 
 /// Figtree for the interface, JetBrains Mono for times and figures.
@@ -33,13 +34,13 @@ abstract final class FibusTheme {
     );
 
     TextStyle t(double size, double height, FontWeight w, Color c) => TextStyle(
-          fontFamily: FibusFonts.ui,
-          fontSize: size,
-          height: height / size,
-          fontWeight: w,
-          color: c,
-          letterSpacing: 0,
-        );
+      fontFamily: FibusFonts.ui,
+      fontSize: size,
+      height: height / size,
+      fontWeight: w,
+      color: c,
+      letterSpacing: 0,
+    );
 
     final text = TextTheme(
       headlineMedium: t(28, 34, FontWeight.w500, p.textPrimary),
@@ -154,7 +155,10 @@ abstract final class FibusTheme {
         hintStyle: text.bodyMedium?.copyWith(color: p.textMuted),
         prefixIconColor: p.textMuted,
         suffixIconColor: p.textMuted,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(FibusSpace.radiusControl),
           borderSide: BorderSide.none,
@@ -169,10 +173,12 @@ abstract final class FibusTheme {
         ),
       ),
       switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith((s) =>
-            s.contains(WidgetState.selected) ? p.onAccent : p.textMuted),
-        trackColor: WidgetStateProperty.resolveWith((s) =>
-            s.contains(WidgetState.selected) ? p.accent : p.raised),
+        thumbColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? p.onAccent : p.textMuted,
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? p.accent : p.raised,
+        ),
         trackOutlineColor: WidgetStateProperty.all(p.hairline),
       ),
       sliderTheme: SliderThemeData(
@@ -229,10 +235,34 @@ abstract final class FibusTheme {
   }
 }
 
+/// Keeps the Android status and navigation bars readable in both themes,
+/// including on screens without an app bar (sign-in, the home map).
+/// Use as `MaterialApp(builder: FibusSystemBars.builder)`.
+abstract final class FibusSystemBars {
+  static Widget builder(BuildContext context, Widget? child) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final icons = dark ? Brightness.light : Brightness.dark;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: icons,
+        statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+        systemNavigationBarColor: context.fib.background,
+        systemNavigationBarIconBrightness: icons,
+      ),
+      child: child ?? const SizedBox.shrink(),
+    );
+  }
+}
+
 /// Figure styles: timetable-like mono with tabular digits.
 abstract final class FibusType {
-  static TextStyle figure(BuildContext context,
-      {double size = 15, FontWeight weight = FontWeight.w400, Color? color}) {
+  static TextStyle figure(
+    BuildContext context, {
+    double size = 15,
+    FontWeight weight = FontWeight.w400,
+    Color? color,
+  }) {
     return TextStyle(
       fontFamily: FibusFonts.mono,
       fontSize: size,

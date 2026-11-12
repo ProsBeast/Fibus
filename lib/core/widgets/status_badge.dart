@@ -90,8 +90,9 @@ class StatusBadge extends StatelessWidget {
             const SizedBox(width: FibusSpace.s8),
             Text(
               customLabel ?? status.label,
-              style: context.type.labelMedium
-                  ?.copyWith(color: isLive ? c.positive : c.textSecondary),
+              style: context.type.labelMedium?.copyWith(
+                color: isLive ? c.positive : c.textSecondary,
+              ),
             ),
           ],
         ),

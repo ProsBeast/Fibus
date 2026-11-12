@@ -46,7 +46,9 @@ class BusModel {
   final DateTime? updatedAt;
 
   /// Creates a [BusModel] instance from a Firestore document snapshot.
-  factory BusModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot) {
+  factory BusModel.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> snapshot,
+  ) {
     final data = snapshot.data() ?? {};
     return BusModel.fromMap(data, snapshot.id);
   }
@@ -61,7 +63,8 @@ class BusModel {
       operatorUids: List<String>.from(map['operatorUids'] as List? ?? []),
       trackerReminderTime: map['trackerReminderTime'] as String? ?? '07:15',
       // ISO weekdays (Mon = 1 … Sun = 7); ignore any non-numeric entries.
-      serviceDays: (map['serviceDays'] as List?)
+      serviceDays:
+          (map['serviceDays'] as List?)
               ?.whereType<num>()
               .map((d) => d.toInt())
               .toList() ??
@@ -82,7 +85,9 @@ class BusModel {
       'trackerReminderTime': trackerReminderTime,
       'serviceDays': serviceDays,
       'timeZone': timeZone,
-      'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
+      'createdAt': createdAt != null
+          ? Timestamp.fromDate(createdAt!)
+          : FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }

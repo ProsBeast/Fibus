@@ -38,7 +38,9 @@ class StopTimeModel {
   ]) {
     final data = snapshot.data();
     if (data == null) {
-      throw StateError('Cannot create StopTimeModel from empty document snapshot');
+      throw StateError(
+        'Cannot create StopTimeModel from empty document snapshot',
+      );
     }
     return StopTimeModel.fromMap(data, id: snapshot.id);
   }

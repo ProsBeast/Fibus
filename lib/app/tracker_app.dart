@@ -92,9 +92,7 @@ class _TrackerAppState extends State<TrackerApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider<AuthService>.value(
-          value: AuthService.instance,
-        ),
+        ChangeNotifierProvider<AuthService>.value(value: AuthService.instance),
         ChangeNotifierProvider<TrackingProvider>(
           create: (_) => TrackingProvider(),
         ),
@@ -112,6 +110,7 @@ class _TrackerAppState extends State<TrackerApp> {
       child: MaterialApp.router(
         title: 'Fibus Tracker',
         debugShowCheckedModeBanner: false,
+        builder: FibusSystemBars.builder,
         theme: FibusTheme.light,
         darkTheme: FibusTheme.dark,
         themeMode: ThemeMode.system,

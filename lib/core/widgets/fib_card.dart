@@ -54,7 +54,12 @@ class SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final label = Text(text, style: context.type.labelMedium);
     if (trailing == null) return label;
-    return Row(children: [Expanded(child: label), trailing!]);
+    return Row(
+      children: [
+        Expanded(child: label),
+        trailing!,
+      ],
+    );
   }
 }
 
@@ -86,25 +91,32 @@ class DetailRow extends StatelessWidget {
             fontFeatures: const [FontFeature.tabularFigures()],
           )
         : context.type.bodyMedium?.copyWith(color: valueColor ?? c.textPrimary);
-    return SizedBox(
-      height: 44,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 44),
       child: Row(
         children: [
           if (icon != null) ...[
-            SizedBox(width: 20, child: Icon(icon, size: 18, color: c.textMuted)),
+            SizedBox(
+              width: 20,
+              child: Icon(icon, size: 18, color: c.textMuted),
+            ),
             const SizedBox(width: FibusSpace.s12),
           ],
           Expanded(
-            child: Text(label,
-                style: context.type.bodyMedium?.copyWith(color: c.textSecondary)),
+            child: Text(
+              label,
+              style: context.type.bodyMedium?.copyWith(color: c.textSecondary),
+            ),
           ),
           const SizedBox(width: FibusSpace.s12),
           Flexible(
-            child: Text(value,
-                style: valueStyle,
-                textAlign: TextAlign.end,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis),
+            child: Text(
+              value,
+              style: valueStyle,
+              textAlign: TextAlign.end,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),

@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 import 'package:fibus/core/constants/firebase_paths.dart';
@@ -21,7 +22,7 @@ class RealtimeDbService {
   }
 
   RealtimeDbService._internal({FirebaseDatabase? database})
-      : _db = database ?? FirebaseDatabase.instance;
+    : _db = database ?? FirebaseDatabase.instance;
 
   // ---------------------------------------------------------------------------
   // GPS Telemetry Publishing
@@ -94,7 +95,9 @@ class RealtimeDbService {
           try {
             buses.add(LiveBusModel.fromRtdb(value, busId: key.toString()));
           } catch (e) {
-            debugPrint('Error parsing LiveBus in streamAllLiveBuses ($key): $e');
+            debugPrint(
+              'Error parsing LiveBus in streamAllLiveBuses ($key): $e',
+            );
           }
         }
       });
@@ -120,10 +123,7 @@ class RealtimeDbService {
   // ---------------------------------------------------------------------------
 
   /// Updates dynamic estimated time of arrival (in seconds) for each stop on the bus route.
-  Future<void> updateBusEta(
-    String busId,
-    Map<String, int> etaByStop,
-  ) async {
+  Future<void> updateBusEta(String busId, Map<String, int> etaByStop) async {
     try {
       final batchUpdates = <String, dynamic>{
         'busEta': etaByStop,
@@ -200,10 +200,7 @@ class RealtimeDbService {
         'endedAtServer': ServerValue.timestamp,
       };
 
-      final busUpdates = {
-        'status': 'ended',
-        'timestamp': nowMs,
-      };
+      final busUpdates = {'status': 'ended', 'timestamp': nowMs};
 
       await Future.wait([
         _db.ref(FirebasePaths.activeSession(busId)).update(sessionUpdates),

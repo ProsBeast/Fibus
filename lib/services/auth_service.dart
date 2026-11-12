@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -50,13 +51,14 @@ class AuthService extends ChangeNotifier {
     FirebaseAuth? auth,
     GoogleSignIn? googleSignIn,
     FirebaseFirestore? firestore,
-  })  : _auth = auth ?? FirebaseAuth.instance,
-        _googleSignIn = googleSignIn ??
-            GoogleSignIn(
-              serverClientId: webClientId,
-              scopes: const ['email', 'profile'],
-            ),
-        _firestore = firestore ?? FirebaseFirestore.instance {
+  }) : _auth = auth ?? FirebaseAuth.instance,
+       _googleSignIn =
+           googleSignIn ??
+           GoogleSignIn(
+             serverClientId: webClientId,
+             scopes: const ['email', 'profile'],
+           ),
+       _firestore = firestore ?? FirebaseFirestore.instance {
     _initAuthListener();
   }
 
@@ -138,14 +140,16 @@ class AuthService extends ChangeNotifier {
       );
 
       // Step 3: Sign in to Firebase Auth
-      final UserCredential userCredential =
-          await _auth.signInWithCredential(credential);
+      final UserCredential userCredential = await _auth.signInWithCredential(
+        credential,
+      );
 
       final User? firebaseUser = userCredential.user;
       if (firebaseUser == null) {
         throw FirebaseAuthException(
           code: 'USER_NULL',
-          message: 'Firebase user was null after successful credential sign-in.',
+          message:
+              'Firebase user was null after successful credential sign-in.',
         );
       }
 
@@ -176,10 +180,7 @@ class AuthService extends ChangeNotifier {
     _clearError();
 
     try {
-      await Future.wait([
-        _googleSignIn.signOut(),
-        _auth.signOut(),
-      ]);
+      await Future.wait([_googleSignIn.signOut(), _auth.signOut()]);
       _userProfile = null;
     } catch (e) {
       _setError('Failed to sign out cleanly: $e');

@@ -74,10 +74,13 @@ class LoadingOverlayContent extends StatelessWidget {
             ),
             if (message != null && message!.isNotEmpty) ...[
               const SizedBox(height: FibusSpace.s16),
-              Text(message!,
-                  textAlign: TextAlign.center,
-                  style: context.type.bodyMedium
-                      ?.copyWith(color: c.textSecondary)),
+              Text(
+                message!,
+                textAlign: TextAlign.center,
+                style: context.type.bodyMedium?.copyWith(
+                  color: c.textSecondary,
+                ),
+              ),
             ],
           ],
         ),

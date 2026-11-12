@@ -21,15 +21,25 @@ class FibusWordmark extends StatelessWidget {
             color: c.accent,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(Icons.directions_bus_outlined, size: 18, color: c.onAccent),
+          child: Icon(
+            Icons.directions_bus_outlined,
+            size: 18,
+            color: c.onAccent,
+          ),
         ),
         const SizedBox(width: FibusSpace.s8),
-        Text('Fibus',
-            style: context.type.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+        Text(
+          'Fibus',
+          style: context.type.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         if (suffix != null) ...[
           const SizedBox(width: FibusSpace.s4),
-          Text(suffix!,
-              style: context.type.titleMedium?.copyWith(color: c.textSecondary)),
+          Text(
+            suffix!,
+            style: context.type.titleMedium?.copyWith(color: c.textSecondary),
+          ),
         ],
       ],
     );

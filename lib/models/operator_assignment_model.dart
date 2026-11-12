@@ -39,13 +39,17 @@ class OperatorAssignmentModel {
     final data = snapshot.data();
     if (data == null) {
       throw StateError(
-          'Cannot create OperatorAssignmentModel from empty document snapshot');
+        'Cannot create OperatorAssignmentModel from empty document snapshot',
+      );
     }
     return OperatorAssignmentModel.fromMap(data, id: snapshot.id);
   }
 
   /// Creates an [OperatorAssignmentModel] from a key-value map and document ID.
-  factory OperatorAssignmentModel.fromMap(Map<String, dynamic> map, {String? id}) {
+  factory OperatorAssignmentModel.fromMap(
+    Map<String, dynamic> map, {
+    String? id,
+  }) {
     DateTime parsedAssigned;
     if (map['assignedAt'] is Timestamp) {
       parsedAssigned = (map['assignedAt'] as Timestamp).toDate();

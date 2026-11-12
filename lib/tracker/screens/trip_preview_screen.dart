@@ -16,6 +16,7 @@ import 'package:fibus/models/stop_model.dart';
 import 'package:fibus/services/auth_service.dart';
 import 'package:fibus/services/firestore_service.dart';
 import 'package:fibus/services/realtime_db_service.dart';
+import 'package:fibus/services/service_calendar.dart';
 import 'package:fibus/tracker/providers/trip_lifecycle_provider.dart';
 
 /// Before the trip: the route, its timetable and one action — start
@@ -32,8 +33,9 @@ class TripPreviewScreen extends StatefulWidget {
 class _TripPreviewScreenState extends State<TripPreviewScreen> {
   final FirestoreService _firestoreService = FirestoreService();
   final RealtimeDbService _rtdbService = RealtimeDbService();
-  late final Stream<LiveBusModel?> _liveStream =
-      _rtdbService.streamLiveBus(widget.busId);
+  late final Stream<LiveBusModel?> _liveStream = _rtdbService.streamLiveBus(
+    widget.busId,
+  );
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -59,7 +61,8 @@ class _TripPreviewScreenState extends State<TripPreviewScreen> {
       var stops = <StopModel>[];
       if (bus.routeIds.isNotEmpty) {
         route = await _firestoreService.getRoute(bus.routeIds.first);
-        if (route != null) stops = await _firestoreService.getStopsByRoute(route.id);
+        if (route != null)
+          stops = await _firestoreService.getStopsByRoute(route.id);
       }
       if (mounted) {
         setState(() {
@@ -121,27 +124,36 @@ class _TripPreviewScreenState extends State<TripPreviewScreen> {
         final myUid = context.read<AuthService>().currentUser?.uid;
         // The feed is this operator's own, for example after the app was
         // closed mid-trip. They may resume without waiting for a takeover.
-        final isMine = live != null && myUid != null && live.operatorUid == myUid;
+        final isMine =
+            live != null && myUid != null && live.operatorUid == myUid;
         final lifecycleNow = context.watch<TripLifecycleProvider>();
-        final trackingHere = lifecycleNow.isActive &&
-            lifecycleNow.currentBusId == widget.busId;
+        final trackingHere =
+            lifecycleNow.isActive && lifecycleNow.currentBusId == widget.busId;
 
         return Scaffold(
           appBar: AppBar(title: Text(_bus!.displayName)),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(
-                FibusSpace.page, FibusSpace.s8, FibusSpace.page, FibusSpace.s24),
+              FibusSpace.page,
+              FibusSpace.s8,
+              FibusSpace.page,
+              FibusSpace.s24,
+            ),
             children: [
               Row(
                 children: [
                   Expanded(
-                    child: Text(_route?.name ?? 'No route set',
-                        style: t.bodyMedium?.copyWith(color: c.textSecondary)),
+                    child: Text(
+                      _route?.name ?? 'No route set',
+                      style: t.bodyMedium?.copyWith(color: c.textSecondary),
+                    ),
                   ),
                   StatusBadge(
                     status: isLive
                         ? TrackingStatus.live
-                        : (isStale ? TrackingStatus.stale : TrackingStatus.offline),
+                        : (isStale
+                              ? TrackingStatus.stale
+                              : TrackingStatus.offline),
                   ),
                 ],
               ),
@@ -154,11 +166,11 @@ class _TripPreviewScreenState extends State<TripPreviewScreen> {
                   child: Text(
                     isMine
                         ? 'Your last trip on this bus was not ended. Resume '
-                            'to keep sharing it'
+                              'to keep sharing it'
                         : isLive
-                            ? 'This bus is being tracked from another phone'
-                            : 'The last tracker stopped sending over a minute '
-                                'ago. You can take over',
+                        ? 'This bus is being tracked from another phone'
+                        : 'The last tracker stopped sending over a minute '
+                              'ago. You can take over',
                     style: t.bodySmall?.copyWith(color: c.textPrimary),
                   ),
                 ),
@@ -174,32 +186,42 @@ class _TripPreviewScreenState extends State<TripPreviewScreen> {
                 child: _buildMap(c),
               ),
               const SizedBox(height: FibusSpace.s24),
-              SectionLabel('Timetable',
-                  trailing: Text('${_stops.length} stops', style: t.labelSmall)),
+              SectionLabel(
+                'Timetable',
+                trailing: Text('${_stops.length} stops', style: t.labelSmall),
+              ),
               const SizedBox(height: FibusSpace.s8),
               FibCard(
                 padding: const EdgeInsets.symmetric(vertical: FibusSpace.s8),
                 child: _stops.isEmpty
                     ? Padding(
                         padding: const EdgeInsets.all(FibusSpace.s16),
-                        child: Text('No stops are set up for this route',
-                            style: t.bodySmall),
+                        child: Text(
+                          'No stops are set up for this route',
+                          style: t.bodySmall,
+                        ),
                       )
-                    : Column(children: [
-                        for (var i = 0; i < _stops.length; i++)
-                          _StopRow(
-                            stop: _stops[i],
-                            first: i == 0,
-                            last: i == _stops.length - 1,
-                          ),
-                      ]),
+                    : Column(
+                        children: [
+                          for (var i = 0; i < _stops.length; i++)
+                            _StopRow(
+                              stop: _stops[i],
+                              first: i == 0,
+                              last: i == _stops.length - 1,
+                            ),
+                        ],
+                      ),
               ),
             ],
           ),
           bottomNavigationBar: SafeArea(
             child: Container(
               padding: const EdgeInsets.fromLTRB(
-                  FibusSpace.page, FibusSpace.s12, FibusSpace.page, FibusSpace.s12),
+                FibusSpace.page,
+                FibusSpace.s12,
+                FibusSpace.page,
+                FibusSpace.s12,
+              ),
               decoration: BoxDecoration(
                 color: c.background,
                 border: Border(top: BorderSide(color: c.hairline)),
@@ -210,24 +232,26 @@ class _TripPreviewScreenState extends State<TripPreviewScreen> {
                       child: const Text('Open tracking'),
                     )
                   : isStale && !isMine
-                      ? FilledButton(
-                          onPressed: () =>
-                              context.push('/takeover/${widget.busId}'),
-                          child: const Text('Take over tracking'),
-                        )
-                      : FilledButton(
-                          onPressed:
-                              lifecycleNow.isProcessing || (isLive && !isMine)
-                                  ? null
-                                  : _handleStartTracking,
-                          child: Text(lifecycleNow.isProcessing
-                              ? 'Starting'
-                              : isMine && (isLive || isStale)
-                                  ? 'Resume tracking'
-                                  : isLive
-                                      ? 'Already tracking'
-                                      : 'Start tracking'),
-                        ),
+                  ? FilledButton(
+                      onPressed: () =>
+                          context.push('/takeover/${widget.busId}'),
+                      child: const Text('Take over tracking'),
+                    )
+                  : FilledButton(
+                      onPressed:
+                          lifecycleNow.isProcessing || (isLive && !isMine)
+                          ? null
+                          : _handleStartTracking,
+                      child: Text(
+                        lifecycleNow.isProcessing
+                            ? 'Starting'
+                            : isMine && (isLive || isStale)
+                            ? 'Resume tracking'
+                            : isLive
+                            ? 'Already tracking'
+                            : 'Start tracking',
+                      ),
+                    ),
             ),
           ),
         );
@@ -240,7 +264,9 @@ class _TripPreviewScreenState extends State<TripPreviewScreen> {
     final points = _route?.polylinePoints ?? const <LatLng>[];
     final center = points.isNotEmpty
         ? points[points.length ~/ 2]
-        : (_stops.isNotEmpty ? _stops.first.location : const LatLng(17.3850, 78.4867));
+        : (_stops.isNotEmpty
+              ? _stops.first.location
+              : const LatLng(17.3850, 78.4867));
     return FlutterMap(
       options: MapOptions(initialCenter: center, initialZoom: 11.5),
       children: [
@@ -248,32 +274,40 @@ class _TripPreviewScreenState extends State<TripPreviewScreen> {
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: 'com.fibus.tracker',
           tileBuilder: (context, tile, _) => ColorFiltered(
-            colorFilter: ColorFilter.matrix(isDark ? MapTiles.dark : MapTiles.quiet),
+            colorFilter: ColorFilter.matrix(
+              isDark ? MapTiles.dark : MapTiles.quiet,
+            ),
             child: tile,
           ),
         ),
         if (points.isNotEmpty)
-          PolylineLayer(polylines: [
-            Polyline(
+          PolylineLayer(
+            polylines: [
+              Polyline(
                 points: points,
                 color: c.textPrimary.withValues(alpha: 0.8),
-                strokeWidth: 3),
-          ]),
-        MarkerLayer(markers: [
-          for (final s in _stops)
-            Marker(
-              point: s.location,
-              width: 12,
-              height: 12,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: c.surface,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: c.textPrimary, width: 2),
+                strokeWidth: 3,
+              ),
+            ],
+          ),
+        const OsmAttribution(),
+        MarkerLayer(
+          markers: [
+            for (final s in _stops)
+              Marker(
+                point: s.location,
+                width: 12,
+                height: 12,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: c.surface,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: c.textPrimary, width: 2),
+                  ),
                 ),
               ),
-            ),
-        ]),
+          ],
+        ),
       ],
     );
   }
@@ -288,33 +322,54 @@ class _StopRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.fib;
-    return SizedBox(
-      height: 44,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 44),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: FibusSpace.s16),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 48,
-              child: Text(stop.scheduledArrivalLocalTime,
-                  style: FibusType.figure(context, size: 13, color: c.textSecondary)),
-            ),
-            SizedBox(
-              width: 24,
-              height: 44,
-              child: CustomPaint(
-                painter: _LinePainter(
-                  first: first,
-                  last: last,
-                  line: c.textMuted.withValues(alpha: 0.4),
-                  ink: c.textPrimary,
-                  fill: c.surface,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 68),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    formatTimetable(stop.scheduledArrivalLocalTime),
+                    style: FibusType.figure(
+                      context,
+                      size: 13,
+                      color: c.textSecondary,
+                    ),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: FibusSpace.s12),
-            Expanded(child: Text(stop.name, style: context.type.bodyMedium)),
-          ],
+              SizedBox(
+                width: 24,
+                child: CustomPaint(
+                  painter: _LinePainter(
+                    first: first,
+                    last: last,
+                    line: c.textMuted.withValues(alpha: 0.4),
+                    ink: c.textPrimary,
+                    fill: c.surface,
+                  ),
+                ),
+              ),
+              const SizedBox(width: FibusSpace.s12),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: FibusSpace.s12,
+                    ),
+                    child: Text(stop.name, style: context.type.bodyMedium),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -337,20 +392,28 @@ class _LinePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final cx = size.width / 2;
     final cy = size.height / 2;
-    canvas.drawLine(Offset(cx, first ? cy : 0), Offset(cx, last ? cy : size.height),
-        Paint()
-          ..color = line
-          ..strokeWidth = 2);
+    canvas.drawLine(
+      Offset(cx, first ? cy : 0),
+      Offset(cx, last ? cy : size.height),
+      Paint()
+        ..color = line
+        ..strokeWidth = 2,
+    );
     final end = first || last;
-    canvas.drawCircle(Offset(cx, cy), end ? 5 : 4, Paint()..color = end ? ink : fill);
+    canvas.drawCircle(
+      Offset(cx, cy),
+      end ? 5 : 4,
+      Paint()..color = end ? ink : fill,
+    );
     if (!end) {
       canvas.drawCircle(
-          Offset(cx, cy),
-          4,
-          Paint()
-            ..color = ink.withValues(alpha: 0.55)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.5);
+        Offset(cx, cy),
+        4,
+        Paint()
+          ..color = ink.withValues(alpha: 0.55)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
+      );
     }
   }
 

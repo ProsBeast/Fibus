@@ -44,7 +44,8 @@ class LiveBus {
 
   /// Map of stopId -> remaining seconds until arrival, or unix seconds.
   final Map<String, int> stopEtas;
-  final String confidenceLabel; // 'high', 'medium', 'low', 'warming_up', 'unavailable'
+  final String
+  confidenceLabel; // 'high', 'medium', 'low', 'warming_up', 'unavailable'
   final String sourceStatus; // 'live_gps', 'schedule_fallback', 'stale'
   final int delayMinutes;
 
@@ -109,7 +110,8 @@ class LiveBus {
     // status 'tracking', lastServerHeartbeat, accuracy, speed, heading and
     // operatorUid. Map those onto this model alongside the PRD field names.
     final rawStatus = (data['status'] as String?) ?? 'not_started';
-    final lastFixAtServer = (data['lastLocationAtServer'] as num?)?.toInt() ??
+    final lastFixAtServer =
+        (data['lastLocationAtServer'] as num?)?.toInt() ??
         (data['lastServerHeartbeat'] as num?)?.toInt();
 
     return LiveBus(
@@ -117,7 +119,8 @@ class LiveBus {
       status: rawStatus == 'tracking' ? 'active' : rawStatus,
       activeTripId: (data['activeTripId'] as String?) ?? '',
       sessionGeneration: (data['sessionGeneration'] as num?)?.toInt() ?? 0,
-      trackerUid: (data['trackerUid'] as String?) ??
+      trackerUid:
+          (data['trackerUid'] as String?) ??
           (data['operatorUid'] as String?) ??
           '',
       startedAtServer: (data['startedAtServer'] as num?)?.toInt(),
@@ -133,15 +136,15 @@ class LiveBus {
       accuracyM: latestLoc != null
           ? (latestLoc['accuracyM'] as num?)?.toDouble()
           : (data['accuracyM'] as num?)?.toDouble() ??
-              (data['accuracy'] as num?)?.toDouble(),
+                (data['accuracy'] as num?)?.toDouble(),
       speedMps: latestLoc != null
           ? (latestLoc['speedMps'] as num?)?.toDouble()
           : (data['speedMps'] as num?)?.toDouble() ??
-              (data['speed'] as num?)?.toDouble(),
+                (data['speed'] as num?)?.toDouble(),
       headingDeg: latestLoc != null
           ? (latestLoc['headingDeg'] as num?)?.toDouble()
           : (data['headingDeg'] as num?)?.toDouble() ??
-              (data['heading'] as num?)?.toDouble(),
+                (data['heading'] as num?)?.toDouble(),
       deviceTimestamp: latestLoc != null
           ? (latestLoc['deviceTimestamp'] as num?)?.toInt()
           : null,

@@ -39,7 +39,9 @@ abstract final class ApiEndpoints {
     bool overviewFull = true,
     bool steps = false,
   }) {
-    final overviewParam = overviewFull ? 'overview=full' : 'overview=simplified';
+    final overviewParam = overviewFull
+        ? 'overview=full'
+        : 'overview=simplified';
     final stepsParam = steps ? '&steps=true' : '';
     return '$osrmBaseUrl/route/v1/$profile/$coordinates?geometries=polyline&$overviewParam$stepsParam';
   }

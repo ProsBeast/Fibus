@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
@@ -38,14 +39,24 @@ class _HomePinScreenState extends State<HomePinScreen> {
   @override
   void initState() {
     super.initState();
+    // Rebuild on focus so the bottom panel can step aside while searching.
+    _searchFocus.addListener(_onFocusChanged);
     final pref = context.read<CommuteProvider>().currentPreference;
     _currentCenter = (pref != null && pref.hasHomePin)
         ? pref.homeLocation
-        : const LatLng(AppConstants.defaultLatitude, AppConstants.defaultLongitude);
+        : const LatLng(
+            AppConstants.defaultLatitude,
+            AppConstants.defaultLongitude,
+          );
+  }
+
+  void _onFocusChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _searchFocus.removeListener(_onFocusChanged);
     _debounceTimer?.cancel();
     _mapController.dispose();
     _searchController.dispose();
@@ -78,8 +89,9 @@ class _HomePinScreenState extends State<HomePinScreen> {
       if (!mounted || seq != _searchSeq) return;
       setState(() {
         _suggestions = results;
-        _searchError =
-            results.isEmpty ? 'No places found for "$query" in Telangana' : null;
+        _searchError = results.isEmpty
+            ? 'No places found for "$query" in Telangana'
+            : null;
       });
     } catch (_) {
       if (!mounted || seq != _searchSeq) return;
@@ -129,7 +141,8 @@ class _HomePinScreenState extends State<HomePinScreen> {
       if (!mounted) return;
       messenger.showSnackBar(const SnackBar(content: Text('Home saved')));
       context.go(
-          commuteProvider.isCommuteSelected ? '/dashboard' : '/choose-commute');
+        commuteProvider.isCommuteSelected ? '/dashboard' : '/choose-commute',
+      );
     } catch (_) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Could not save your home. Try again')),
@@ -141,13 +154,13 @@ class _HomePinScreenState extends State<HomePinScreen> {
 
   /// A surface floating over the map: neutral with a soft, small shadow.
   BoxDecoration _floating(FibusPalette c) => BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(FibusSpace.radiusCard),
-        border: Border.all(color: c.hairline),
-        boxShadow: const [
-          BoxShadow(color: Color(0x14000000), blurRadius: 24, offset: Offset(0, 8)),
-        ],
-      );
+    color: c.surface,
+    borderRadius: BorderRadius.circular(FibusSpace.radiusCard),
+    border: Border.all(color: c.hairline),
+    boxShadow: const [
+      BoxShadow(color: Color(0x14000000), blurRadius: 24, offset: Offset(0, 8)),
+    ],
+  );
 
   Widget _buildSearchResults(FibusPalette c) {
     if (_suggestions.isEmpty && _searchError == null) {
@@ -166,23 +179,32 @@ class _HomePinScreenState extends State<HomePinScreen> {
               shrinkWrap: true,
               padding: const EdgeInsets.symmetric(vertical: FibusSpace.s4),
               itemCount: _suggestions.length,
-              separatorBuilder: (_, _) => const Divider(indent: 48, endIndent: 16),
+              separatorBuilder: (_, _) =>
+                  const Divider(indent: 48, endIndent: 16),
               itemBuilder: (context, index) {
                 final place = _suggestions[index];
                 return ListTile(
                   minLeadingWidth: 20,
                   horizontalTitleGap: FibusSpace.s12,
-                  leading: Icon(Icons.place_outlined, size: 18, color: c.textMuted),
-                  title: Text(place.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.type.bodyMedium),
+                  leading: Icon(
+                    Icons.place_outlined,
+                    size: 18,
+                    color: c.textMuted,
+                  ),
+                  title: Text(
+                    place.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.type.bodyMedium,
+                  ),
                   subtitle: place.subtitle.isEmpty
                       ? null
-                      : Text(place.subtitle,
+                      : Text(
+                          place.subtitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: context.type.bodySmall),
+                          style: context.type.bodySmall,
+                        ),
                   onTap: () => _selectSuggestion(place),
                 );
               },
@@ -215,7 +237,8 @@ class _HomePinScreenState extends State<HomePinScreen> {
                 userAgentPackageName: 'com.fibus.commuter',
                 tileBuilder: (context, tile, _) => ColorFiltered(
                   colorFilter: ColorFilter.matrix(
-                      isDark ? MapTiles.dark : MapTiles.quiet),
+                    isDark ? MapTiles.dark : MapTiles.quiet,
+                  ),
                   child: tile,
                 ),
               ),
@@ -238,7 +261,11 @@ class _HomePinScreenState extends State<HomePinScreen> {
                         shape: BoxShape.circle,
                         border: Border.all(color: c.surface, width: 3),
                       ),
-                      child: Icon(Icons.home_outlined, size: 20, color: c.onAccent),
+                      child: Icon(
+                        Icons.home_outlined,
+                        size: 20,
+                        color: c.onAccent,
+                      ),
                     ),
                     Container(width: 2, height: 12, color: c.textPrimary),
                     Container(
@@ -258,7 +285,11 @@ class _HomePinScreenState extends State<HomePinScreen> {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(
-                  FibusSpace.s16, FibusSpace.s12, FibusSpace.s16, 0),
+                FibusSpace.s16,
+                FibusSpace.s12,
+                FibusSpace.s16,
+                0,
+              ),
               child: Column(
                 children: [
                   Row(
@@ -300,22 +331,25 @@ class _HomePinScreenState extends State<HomePinScreen> {
                                       child: SizedBox(
                                         width: 16,
                                         height: 16,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
                                       ),
                                     )
                                   : _searchController.text.isEmpty
-                                      ? null
-                                      : IconButton(
-                                          tooltip: 'Clear',
-                                          icon: const Icon(Icons.close, size: 18),
-                                          onPressed: _clearSearch,
-                                        ),
+                                  ? null
+                                  : IconButton(
+                                      tooltip: 'Clear',
+                                      icon: const Icon(Icons.close, size: 18),
+                                      onPressed: _clearSearch,
+                                    ),
                               hintText: 'Search your area',
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
                               focusedBorder: InputBorder.none,
-                              contentPadding:
-                                  const EdgeInsets.symmetric(vertical: 14),
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 14,
+                              ),
                             ),
                           ),
                         ),
@@ -323,44 +357,52 @@ class _HomePinScreenState extends State<HomePinScreen> {
                     ],
                   ),
                   _buildSearchResults(c),
+                  const SizedBox(height: FibusSpace.s8),
+                  const Align(
+                    alignment: Alignment.centerRight,
+                    child: OsmAttributionChip(),
+                  ),
                 ],
               ),
             ),
           ),
 
-          Positioned(
-            left: FibusSpace.s16,
-            right: FibusSpace.s16,
-            bottom: FibusSpace.s16,
-            child: SafeArea(
-              top: false,
-              child: Container(
-                padding: const EdgeInsets.all(FibusSpace.s20),
-                decoration: _floating(c),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Set your home', style: t.titleMedium),
-                    const SizedBox(height: FibusSpace.s4),
-                    Text(
-                      'Drag the map until the pin sits on your gate. Fibus uses '
-                      'it to time your scooter ride to the stop',
-                      style: t.bodySmall,
-                    ),
-                    const SizedBox(height: FibusSpace.s16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: _isSaving ? null : _confirmHomeLocation,
-                        child: Text(_isSaving ? 'Saving' : 'Save home'),
+          // Hidden while typing: with the keyboard up it would cover the
+          // search results.
+          if (!_searchFocus.hasFocus)
+            Positioned(
+              left: FibusSpace.s16,
+              right: FibusSpace.s16,
+              bottom: FibusSpace.s16,
+              child: SafeArea(
+                top: false,
+                child: Container(
+                  padding: const EdgeInsets.all(FibusSpace.s20),
+                  decoration: _floating(c),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Set your home', style: t.titleMedium),
+                      const SizedBox(height: FibusSpace.s4),
+                      Text(
+                        'Drag the map until the pin sits on your gate. Fibus uses '
+                        'it to time your scooter ride to the stop',
+                        style: t.bodySmall,
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: FibusSpace.s16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: _isSaving ? null : _confirmHomeLocation,
+                          child: Text(_isSaving ? 'Saving' : 'Save home'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

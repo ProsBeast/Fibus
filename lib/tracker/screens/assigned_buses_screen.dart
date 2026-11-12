@@ -45,8 +45,9 @@ class _AssignedBusesScreenState extends State<AssignedBusesScreen> {
       final currentUser = auth.currentUser;
       if (currentUser == null) throw Exception('Not signed in');
 
-      final assignments =
-          await _firestoreService.getAssignmentsForOperator(currentUser.uid);
+      final assignments = await _firestoreService.getAssignmentsForOperator(
+        currentUser.uid,
+      );
       final busIds = assignments.map((a) => a.busId).toList();
 
       // Fall back to the buses catalog when no assignment documents exist.
@@ -144,7 +145,8 @@ class _AssignedBusesScreenState extends State<AssignedBusesScreen> {
           ErrorDisplay(
             icon: Icons.directions_bus_outlined,
             title: 'No buses assigned to you',
-            message: 'Ask your Fibus admin to add you as the operator of your bus, '
+            message:
+                'Ask your Fibus admin to add you as the operator of your bus, '
                 'then pull down to refresh',
           ),
         ],
@@ -152,7 +154,11 @@ class _AssignedBusesScreenState extends State<AssignedBusesScreen> {
     }
     return ListView(
       padding: const EdgeInsets.fromLTRB(
-          FibusSpace.page, FibusSpace.s8, FibusSpace.page, FibusSpace.s32),
+        FibusSpace.page,
+        FibusSpace.s8,
+        FibusSpace.page,
+        FibusSpace.s32,
+      ),
       children: [
         Text('Your buses', style: t.headlineSmall),
         const SizedBox(height: FibusSpace.s16),
@@ -181,8 +187,8 @@ class _BusCard extends StatelessWidget {
         final status = (live?.isLive ?? false)
             ? TrackingStatus.live
             : (live?.isStale ?? false)
-                ? TrackingStatus.stale
-                : TrackingStatus.offline;
+            ? TrackingStatus.stale
+            : TrackingStatus.offline;
         return FibCard(
           onTap: () => context.push('/trip-preview/${item.bus.id}'),
           child: Row(
@@ -193,10 +199,12 @@ class _BusCard extends StatelessWidget {
                   children: [
                     Text(item.bus.displayName, style: t.titleSmall),
                     const SizedBox(height: FibusSpace.s4),
-                    Text(item.route?.name ?? 'No route set',
-                        style: t.bodySmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
+                    Text(
+                      item.route?.name ?? 'No route set',
+                      style: t.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     const SizedBox(height: FibusSpace.s12),
                     StatusBadge(status: status),
                   ],

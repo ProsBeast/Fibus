@@ -70,10 +70,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final user = context.watch<AuthService>().currentUser;
     final commute = context.watch<CommuteProvider>();
     final pref = commute.currentPreference;
-    final lead = _draftLead ??
-        (pref?.advanceWarningMinutes ?? AppConstants.defaultAdvanceWarningMinutes)
+    final lead =
+        _draftLead ??
+        (pref?.advanceWarningMinutes ??
+                AppConstants.defaultAdvanceWarningMinutes)
             .toDouble();
-    final name = user?.displayName?.isNotEmpty == true ? user!.displayName! : 'You';
+    final name = user?.displayName?.isNotEmpty == true
+        ? user!.displayName!
+        : 'You';
 
     return Scaffold(
       appBar: AppBar(
@@ -87,7 +91,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
-              FibusSpace.page, FibusSpace.s8, FibusSpace.page, FibusSpace.s32),
+            FibusSpace.page,
+            FibusSpace.s8,
+            FibusSpace.page,
+            FibusSpace.s32,
+          ),
           children: [
             FibCard(
               padding: const EdgeInsets.all(FibusSpace.s16),
@@ -96,10 +104,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   CircleAvatar(
                     radius: 20,
                     backgroundColor: c.raised,
-                    foregroundImage:
-                        user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
-                    child: Text(name.characters.first.toUpperCase(),
-                        style: t.titleSmall?.copyWith(color: c.textSecondary)),
+                    foregroundImage: user?.photoURL != null
+                        ? NetworkImage(user!.photoURL!)
+                        : null,
+                    child: Text(
+                      name.characters.first.toUpperCase(),
+                      style: t.titleSmall?.copyWith(color: c.textSecondary),
+                    ),
                   ),
                   const SizedBox(width: FibusSpace.s12),
                   Expanded(
@@ -108,10 +119,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         Text(name, style: t.titleSmall),
                         if (user?.email != null)
-                          Text(user!.email!,
-                              style: t.bodySmall,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
+                          Text(
+                            user!.email!,
+                            style: t.bodySmall,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                       ],
                     ),
                   ),
@@ -128,7 +141,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _NavRow(
                     icon: Icons.home_outlined,
                     title: 'Home',
-                    value: pref != null && pref.hasHomePin ? 'Saved' : 'Not set',
+                    value: pref != null && pref.hasHomePin
+                        ? 'Saved'
+                        : 'Not set',
                     onTap: () => context.push('/home-pin'),
                   ),
                   const Divider(indent: 48),
@@ -153,12 +168,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Row(
                     children: [
                       Expanded(child: Text('Heads-up', style: t.bodyMedium)),
-                      Text('${lead.round()} min before',
-                          style: FibusType.figure(context, size: 14)),
+                      Text(
+                        '${lead.round()} min before',
+                        style: FibusType.figure(context, size: 14),
+                      ),
                     ],
                   ),
                   Slider(
-                    value: lead,
+                    value: lead.clamp(5.0, 30.0),
                     min: 5,
                     max: 30,
                     divisions: 5,
@@ -183,7 +200,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ? 'Allowed'
                                   : 'Blocked, so alerts cannot reach you',
                               style: t.bodySmall?.copyWith(
-                                  color: _notificationsEnabled ? null : c.negative),
+                                color: _notificationsEnabled
+                                    ? null
+                                    : c.negative,
+                              ),
                             ),
                           ],
                         ),
@@ -192,7 +212,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         OutlinedButton(
                           onPressed: _requestNotifications,
                           style: OutlinedButton.styleFrom(
-                              minimumSize: const Size(0, 40)),
+                            minimumSize: const Size(0, 40),
+                          ),
                           child: const Text('Allow'),
                         ),
                     ],
@@ -211,8 +232,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: FibusSpace.s16),
             Center(
-              child: Text('Fibus 1.0.0 · Route 9 pilot',
-                  style: FibusType.figure(context, size: 12, color: c.textMuted)),
+              child: Text(
+                'Fibus 1.0.0 · Route 9 pilot',
+                style: FibusType.figure(context, size: 12, color: c.textMuted),
+              ),
             ),
           ],
         ),
@@ -239,20 +262,28 @@ class _NavRow extends StatelessWidget {
     final c = context.fib;
     return InkWell(
       onTap: onTap,
-      child: SizedBox(
-        height: 56,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: FibusSpace.s16),
+          padding: const EdgeInsets.symmetric(
+            horizontal: FibusSpace.s16,
+            vertical: FibusSpace.s8,
+          ),
           child: Row(
             children: [
-              SizedBox(width: 20, child: Icon(icon, size: 18, color: c.textSecondary)),
+              SizedBox(
+                width: 20,
+                child: Icon(icon, size: 18, color: c.textSecondary),
+              ),
               const SizedBox(width: FibusSpace.s12),
               Expanded(child: Text(title, style: context.type.bodyMedium)),
               Flexible(
-                child: Text(value,
-                    style: context.type.bodySmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
+                child: Text(
+                  value,
+                  style: context.type.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               const SizedBox(width: FibusSpace.s4),
               Icon(Icons.chevron_right, size: 18, color: c.textMuted),

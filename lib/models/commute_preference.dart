@@ -78,13 +78,17 @@ class CommutePreference {
 
   /// Factory constructor for Firestore documents.
   factory CommutePreference.fromFirestore(
-      DocumentSnapshot<Map<String, dynamic>> snapshot) {
+    DocumentSnapshot<Map<String, dynamic>> snapshot,
+  ) {
     final data = snapshot.data() ?? {};
     return CommutePreference.fromMap(data, snapshot.id);
   }
 
   /// Parses from a map.
-  factory CommutePreference.fromMap(Map<String, dynamic> map, [String id = '']) {
+  factory CommutePreference.fromMap(
+    Map<String, dynamic> map, [
+    String id = '',
+  ]) {
     return CommutePreference(
       id: id.isNotEmpty ? id : (map['id'] as String? ?? ''),
       userId: map['userId'] as String? ?? '',
@@ -96,7 +100,8 @@ class CommutePreference {
       routeName: map['routeName'] as String? ?? '',
       boardingStopId: map['boardingStopId'] as String? ?? '',
       boardingStopName: map['boardingStopName'] as String? ?? '',
-      advanceWarningMinutes: (map['advanceWarningMinutes'] as num?)?.toInt() ?? 10,
+      advanceWarningMinutes:
+          (map['advanceWarningMinutes'] as num?)?.toInt() ?? 10,
       isEnabled: map['isEnabled'] as bool? ?? true,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),

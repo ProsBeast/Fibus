@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:fibus/core/constants/app_constants.dart';
@@ -35,9 +36,9 @@ class TripLifecycleProvider extends ChangeNotifier {
     RealtimeDbService? rtdbService,
     AuthService? authService,
     TrackingProvider? trackingProvider,
-  })  : _rtdbService = rtdbService ?? RealtimeDbService(),
-        _authService = authService ?? AuthService.instance,
-        _trackingProvider = trackingProvider;
+  }) : _rtdbService = rtdbService ?? RealtimeDbService(),
+       _authService = authService ?? AuthService.instance,
+       _trackingProvider = trackingProvider;
 
   final RealtimeDbService _rtdbService;
   final AuthService _authService;
@@ -96,12 +97,17 @@ class TripLifecycleProvider extends ChangeNotifier {
 
       // 2. Claim a newer session. The database rules reject the claim when
       //    another phone is live or this operator is not assigned.
-      final newGen = await _rtdbService
+      final newGen =
+          await _rtdbService
               .getSessionGeneration(busId)
               .timeout(AppConstants.saveTimeout) +
           1;
       await _rtdbService
-          .createSession(busId: busId, operatorUid: user.uid, generation: newGen)
+          .createSession(
+            busId: busId,
+            operatorUid: user.uid,
+            generation: newGen,
+          )
           .timeout(AppConstants.saveTimeout);
       claimed = true;
 
@@ -113,7 +119,10 @@ class TripLifecycleProvider extends ChangeNotifier {
       _lastStartedAt = DateTime.now();
       _tripState = TripState.active;
       _autoEndTimer?.cancel();
-      _autoEndTimer = Timer(AppConstants.maxTripDuration, () => _autoEnd(busId));
+      _autoEndTimer = Timer(
+        AppConstants.maxTripDuration,
+        () => _autoEnd(busId),
+      );
       return true;
     } catch (e) {
       debugPrint('TripLifecycleProvider: start failed: $e');

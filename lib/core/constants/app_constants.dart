@@ -12,7 +12,9 @@ abstract final class AppConstants {
   // Tracking & GPS Thresholds
   /// Bus status is considered stale if no GPS update has been received within 60 seconds.
   static const int staleThresholdSeconds = 60;
-  static const Duration staleThreshold = Duration(seconds: staleThresholdSeconds);
+  static const Duration staleThreshold = Duration(
+    seconds: staleThresholdSeconds,
+  );
 
   /// Target interval between continuous GPS location updates in the Tracker app.
   static const int gpsIntervalSeconds = 5;
@@ -20,7 +22,9 @@ abstract final class AppConstants {
 
   /// Time window over which speed and position updates are smoothed for ETA calculation.
   static const int smoothingWindowSeconds = 180;
-  static const Duration smoothingWindow = Duration(seconds: smoothingWindowSeconds);
+  static const Duration smoothingWindow = Duration(
+    seconds: smoothingWindowSeconds,
+  );
 
   /// Worst horizontal accuracy the Tracker still uploads (PRD §9.2: 100 m).
   /// Inside a bus, fixes of 50 to 100 m are common and still useful.
@@ -61,15 +65,21 @@ abstract final class AppConstants {
   // Commute & Departure Buffers
   /// Minimum time allocated for the commuter to walk to the stop and board the bus.
   static const int boardingBufferMinutes = 5;
-  static const Duration boardingBuffer = Duration(minutes: boardingBufferMinutes);
+  static const Duration boardingBuffer = Duration(
+    minutes: boardingBufferMinutes,
+  );
 
   /// Maximum dynamic safety margin added to commuter departure time under unpredictable conditions.
   static const int maxSafetyMarginMinutes = 5;
-  static const Duration maxSafetyMargin = Duration(minutes: maxSafetyMarginMinutes);
+  static const Duration maxSafetyMargin = Duration(
+    minutes: maxSafetyMarginMinutes,
+  );
 
   /// Default advance warning time in minutes before recommended departure.
   static const int defaultAdvanceWarningMinutes = 10;
-  static const Duration defaultAdvanceWarning = Duration(minutes: defaultAdvanceWarningMinutes);
+  static const Duration defaultAdvanceWarning = Duration(
+    minutes: defaultAdvanceWarningMinutes,
+  );
 
   // Service Region (pilot runs in Telangana)
   /// State name that location search results must belong to.
@@ -81,6 +91,7 @@ abstract final class AppConstants {
   // Map & Navigation Defaults
   /// Default map center latitude (Hyderabad, Telangana, India).
   static const double defaultLatitude = 17.3850;
+
   /// Default map center longitude (Hyderabad, Telangana, India).
   static const double defaultLongitude = 78.4867;
 

@@ -47,13 +47,18 @@ class CommutePreferenceModel {
   ]) {
     final data = snapshot.data();
     if (data == null) {
-      throw StateError('Cannot create CommutePreferenceModel from empty document snapshot');
+      throw StateError(
+        'Cannot create CommutePreferenceModel from empty document snapshot',
+      );
     }
     return CommutePreferenceModel.fromMap(data, id: snapshot.id);
   }
 
   /// Creates a [CommutePreferenceModel] from a key-value map and document ID.
-  factory CommutePreferenceModel.fromMap(Map<String, dynamic> map, {String? id}) {
+  factory CommutePreferenceModel.fromMap(
+    Map<String, dynamic> map, {
+    String? id,
+  }) {
     DateTime parsedCreated;
     if (map['createdAt'] is Timestamp) {
       parsedCreated = (map['createdAt'] as Timestamp).toDate();
@@ -69,7 +74,8 @@ class CommutePreferenceModel {
       routeId: map['routeId'] as String? ?? '',
       stopId: map['stopId'] as String? ?? '',
       busId: map['busId'] as String?,
-      advanceWarningMinutes: (map['advanceWarningMinutes'] as num?)?.toInt() ??
+      advanceWarningMinutes:
+          (map['advanceWarningMinutes'] as num?)?.toInt() ??
           AppConstants.defaultAdvanceWarningMinutes,
       isActive: map['isActive'] as bool? ?? true,
       createdAt: parsedCreated,

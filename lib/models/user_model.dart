@@ -119,7 +119,9 @@ class UserModel {
       'homeLat': homeLatLng?.latitude,
       'homeLng': homeLatLng?.longitude,
       'createdAt': Timestamp.fromDate(createdAt),
-      'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : FieldValue.serverTimestamp(),
+      'updatedAt': updatedAt != null
+          ? Timestamp.fromDate(updatedAt!)
+          : FieldValue.serverTimestamp(),
     };
   }
 

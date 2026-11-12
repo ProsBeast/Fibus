@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer' as developer;
+
 import 'package:flutter/foundation.dart';
 import 'package:fibus/models/bus_model.dart';
 import 'package:fibus/models/commute_preference.dart';
@@ -20,9 +21,9 @@ class CommuteProvider extends ChangeNotifier {
     FirestoreService? firestoreService,
     RtdbService? rtdbService,
     RouteService? routeService,
-  })  : _firestore = firestoreService ?? FirestoreService.instance,
-        _rtdb = rtdbService ?? RtdbService.instance,
-        _routeService = routeService ?? RouteService.instance;
+  }) : _firestore = firestoreService ?? FirestoreService.instance,
+       _rtdb = rtdbService ?? RtdbService.instance,
+       _routeService = routeService ?? RouteService.instance;
 
   final FirestoreService _firestore;
   final RtdbService _rtdb;
@@ -53,7 +54,8 @@ class CommuteProvider extends ChangeNotifier {
   BusModel? get currentBus => _currentBus;
   StopModel? get currentStop => _currentStop;
   LiveBus? get liveBus => _liveBus;
-  DepartureRecommendation? get departureRecommendation => _departureRecommendation;
+  DepartureRecommendation? get departureRecommendation =>
+      _departureRecommendation;
   List<StopModel> get routeStops => _routeStops;
 
   /// Stop positions along the route (0..1), for the route strip.
@@ -105,7 +107,9 @@ class CommuteProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _currentPreference = await _firestore.getCommutePreference(_activeUserId!);
+      _currentPreference = await _firestore.getCommutePreference(
+        _activeUserId!,
+      );
 
       if (_currentPreference != null && _currentPreference!.isFullyConfigured) {
         await _resolveCommuteEntities(_currentPreference!);
@@ -169,17 +173,19 @@ class CommuteProvider extends ChangeNotifier {
   void _subscribeToLiveBus(String busId) {
     _liveBusSubscription?.cancel();
 
-    _liveBusSubscription = _rtdb.streamLiveBus(busId).listen(
-      (busUpdate) {
-        _liveBus = busUpdate;
-        if (busUpdate != null) _etaEstimator?.ingest(busUpdate);
-        _recomputeRecommendation();
-        notifyListeners();
-      },
-      onError: (err) {
-        developer.log('RTDB live bus stream error', error: err);
-      },
-    );
+    _liveBusSubscription = _rtdb
+        .streamLiveBus(busId)
+        .listen(
+          (busUpdate) {
+            _liveBus = busUpdate;
+            if (busUpdate != null) _etaEstimator?.ingest(busUpdate);
+            _recomputeRecommendation();
+            notifyListeners();
+          },
+          onError: (err) {
+            developer.log('RTDB live bus stream error', error: err);
+          },
+        );
   }
 
   /// Estimates scooter travel time between home coordinate and boarding stop.
@@ -191,7 +197,10 @@ class CommuteProvider extends ChangeNotifier {
     final stop = _currentStop!.location;
 
     try {
-      final duration = await _routeService.estimateScooterDurationSeconds(home, stop);
+      final duration = await _routeService.estimateScooterDurationSeconds(
+        home,
+        stop,
+      );
       _scooterDurationSeconds = duration;
     } catch (e) {
       developer.log('Scooter travel estimation error', error: e);
@@ -212,7 +221,7 @@ class CommuteProvider extends ChangeNotifier {
     _etaEstimate = stop == null
         ? BusEtaEstimate.noTracker
         : (_etaEstimator?.estimate(_liveBus, stop.id, now) ??
-            BusEtaEstimate.noTracker);
+              BusEtaEstimate.noTracker);
 
     // Timetable time to fall back on. While today's trip is being tracked
     // (even with poor GPS) it stays on today. With no tracker it moves to
@@ -226,7 +235,8 @@ class CommuteProvider extends ChangeNotifier {
           ? null
           : DateTime(now.year, now.month, now.day, time.hour, time.minute);
       final status = _etaEstimate.status;
-      final tripRunningToday = status == LiveEtaStatus.live ||
+      final tripRunningToday =
+          status == LiveEtaStatus.live ||
           status == LiveEtaStatus.warmingUp ||
           status == LiveEtaStatus.stale ||
           status == LiveEtaStatus.offRoute;
@@ -244,7 +254,10 @@ class CommuteProvider extends ChangeNotifier {
     final effectiveEta =
         _etaEstimate.eta ?? scheduled ?? now.add(const Duration(minutes: 30));
     _serviceDay = DateTime(
-        effectiveEta.year, effectiveEta.month, effectiveEta.day);
+      effectiveEta.year,
+      effectiveEta.month,
+      effectiveEta.day,
+    );
 
     _departureRecommendation = _routeService.computeDeparture(
       busEta: effectiveEta,
@@ -357,7 +370,9 @@ class CommuteProvider extends ChangeNotifier {
   Future<void> updateAdvanceWarningMinutes(int minutes) async {
     if (_currentPreference == null || _activeUserId == null) return;
 
-    final updated = _currentPreference!.copyWith(advanceWarningMinutes: minutes);
+    final updated = _currentPreference!.copyWith(
+      advanceWarningMinutes: minutes,
+    );
     try {
       await _firestore.saveCommutePreference(updated);
       _currentPreference = updated;

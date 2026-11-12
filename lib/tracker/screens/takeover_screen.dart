@@ -48,7 +48,8 @@ class _TakeoverScreenState extends State<TakeoverScreen> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Could not check the current trip. Check your connection';
+          _errorMessage =
+              'Could not check the current trip. Check your connection';
           _isLoading = false;
         });
       }
@@ -95,52 +96,70 @@ class _TakeoverScreenState extends State<TakeoverScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
           : _errorMessage != null
-              ? ErrorDisplay(message: _errorMessage!, onRetry: _fetchLiveStatus)
-              : ListView(
-                  padding: const EdgeInsets.fromLTRB(FibusSpace.page,
-                      FibusSpace.s8, FibusSpace.page, FibusSpace.s24),
-                  children: [
-                    Text('Track this bus from your phone', style: t.headlineSmall),
-                    const SizedBox(height: FibusSpace.s8),
-                    Text(
-                      'The other phone stops counting as the tracker. If it '
-                      'sends again, its updates are ignored',
-                      style: t.bodyMedium?.copyWith(color: c.textSecondary),
-                    ),
-                    const SizedBox(height: FibusSpace.s24),
-                    const SectionLabel('Current trip'),
-                    const SizedBox(height: FibusSpace.s8),
-                    FibCard(
-                      padding: const EdgeInsets.symmetric(horizontal: FibusSpace.s16),
-                      child: Column(
-                        children: [
-                          DetailRow(label: 'Status', value: _feed()),
-                          const Divider(),
-                          DetailRow(label: 'Last GPS fix', value: _lastFix(), mono: true),
-                          const Divider(),
-                          DetailRow(
-                            label: 'Session',
-                            value: '${_liveBus?.sessionGeneration ?? 0}',
-                            mono: true,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+          ? ErrorDisplay(message: _errorMessage!, onRetry: _fetchLiveStatus)
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(
+                FibusSpace.page,
+                FibusSpace.s8,
+                FibusSpace.page,
+                FibusSpace.s24,
+              ),
+              children: [
+                Text('Track this bus from your phone', style: t.headlineSmall),
+                const SizedBox(height: FibusSpace.s8),
+                Text(
+                  'The other phone stops counting as the tracker. If it '
+                  'sends again, its updates are ignored',
+                  style: t.bodyMedium?.copyWith(color: c.textSecondary),
                 ),
+                const SizedBox(height: FibusSpace.s24),
+                const SectionLabel('Current trip'),
+                const SizedBox(height: FibusSpace.s8),
+                FibCard(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: FibusSpace.s16,
+                  ),
+                  child: Column(
+                    children: [
+                      DetailRow(label: 'Status', value: _feed()),
+                      const Divider(),
+                      DetailRow(
+                        label: 'Last GPS fix',
+                        value: _lastFix(),
+                        mono: true,
+                      ),
+                      const Divider(),
+                      DetailRow(
+                        label: 'Session',
+                        value: '${_liveBus?.sessionGeneration ?? 0}',
+                        mono: true,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
       bottomNavigationBar: _isLoading || _errorMessage != null
           ? null
           : SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(
-                    FibusSpace.page, FibusSpace.s12, FibusSpace.page, FibusSpace.s12),
+                  FibusSpace.page,
+                  FibusSpace.s12,
+                  FibusSpace.page,
+                  FibusSpace.s12,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     FilledButton(
-                      onPressed: lifecycle.isProcessing ? null : _executeTakeover,
-                      child: Text(lifecycle.isProcessing ? 'Taking over' : 'Take over'),
+                      onPressed: lifecycle.isProcessing
+                          ? null
+                          : _executeTakeover,
+                      child: Text(
+                        lifecycle.isProcessing ? 'Taking over' : 'Take over',
+                      ),
                     ),
                     const SizedBox(height: FibusSpace.s8),
                     TextButton(

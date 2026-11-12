@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
+
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:fibus/core/constants/api_endpoints.dart';
@@ -75,14 +76,20 @@ class PhotonGeocodingService implements GeocodingService {
       },
     );
 
-    final response = await _client.get(
-      uri,
-      headers: {'User-Agent': '${AppConstants.commuterPackageName} (Fibus pilot)'},
-    ).timeout(const Duration(seconds: 8));
+    final response = await _client
+        .get(
+          uri,
+          headers: {
+            'User-Agent': '${AppConstants.commuterPackageName} (Fibus pilot)',
+          },
+        )
+        .timeout(const Duration(seconds: 8));
 
     if (response.statusCode != 200) {
       developer.log('Photon search failed: HTTP ${response.statusCode}');
-      throw Exception('Location search is unavailable (HTTP ${response.statusCode}).');
+      throw Exception(
+        'Location search is unavailable (HTTP ${response.statusCode}).',
+      );
     }
 
     final data = json.decode(response.body) as Map<String, dynamic>;
@@ -109,8 +116,12 @@ class PhotonGeocodingService implements GeocodingService {
       return null;
     }
 
-    final street = [field('housenumber'), field('street')].whereType<String>().join(' ');
-    final title = field('name') ?? (street.isNotEmpty ? street : null) ?? field('city');
+    final street = [
+      field('housenumber'),
+      field('street'),
+    ].whereType<String>().join(' ');
+    final title =
+        field('name') ?? (street.isNotEmpty ? street : null) ?? field('city');
     if (title == null) return null;
 
     final context = <String>{

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:math';
+
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:fibus/core/constants/app_constants.dart';
@@ -68,7 +69,9 @@ class RouteService {
         '?overview=false',
       );
 
-      final response = await _client.get(url).timeout(const Duration(seconds: 4));
+      final response = await _client
+          .get(url)
+          .timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -80,7 +83,10 @@ class RouteService {
         }
       }
     } catch (e) {
-      developer.log('OSRM routing request failed, falling back to calculation', error: e);
+      developer.log(
+        'OSRM routing request failed, falling back to calculation',
+        error: e,
+      );
     }
 
     // Fallback calculation: Haversine distance with average urban scooter speed (25 km/h = 6.94 m/s)
@@ -93,7 +99,8 @@ class RouteService {
     final dLat = _deg2rad(to.latitude - from.latitude);
     final dLon = _deg2rad(to.longitude - from.longitude);
 
-    final a = sin(dLat / 2) * sin(dLat / 2) +
+    final a =
+        sin(dLat / 2) * sin(dLat / 2) +
         cos(_deg2rad(from.latitude)) *
             cos(_deg2rad(to.latitude)) *
             sin(dLon / 2) *
@@ -106,7 +113,8 @@ class RouteService {
     final roadDistanceMeters = straightDistanceMeters * 1.35;
     const averageSpeedMetersPerSec = 25.0 * 1000.0 / 3600.0; // 6.94 m/s
 
-    final durationSeconds = (roadDistanceMeters / averageSpeedMetersPerSec).round();
+    final durationSeconds = (roadDistanceMeters / averageSpeedMetersPerSec)
+        .round();
     return max(180, durationSeconds); // minimum 3 minutes
   }
 
@@ -127,14 +135,17 @@ class RouteService {
 
     // 2. Dynamic Safety Margin: 2 min base + dynamic uncertainty
     const baseMarginSeconds = 120; // 2 minutes
-    final dynamicUncertaintySeconds =
-        min(300, (scooterDurationSeconds * 0.15).round()); // max 5 mins
+    final dynamicUncertaintySeconds = min(
+      300,
+      (scooterDurationSeconds * 0.15).round(),
+    ); // max 5 mins
     final safetyMarginSeconds = baseMarginSeconds + dynamicUncertaintySeconds;
 
     // 3. Recommended Leave By = targetArrival - scooterDuration - safetyMargin
     final totalOffsetSeconds = scooterDurationSeconds + safetyMarginSeconds;
-    final recommendedLeaveBy =
-        targetStopArrival.subtract(Duration(seconds: totalOffsetSeconds));
+    final recommendedLeaveBy = targetStopArrival.subtract(
+      Duration(seconds: totalOffsetSeconds),
+    );
 
     // 4. Delay calculations
     int delayMinutes = 0;

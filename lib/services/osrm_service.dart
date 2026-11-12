@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
@@ -77,7 +78,7 @@ class OsrmService {
   }
 
   OsrmService._internal({http.Client? client})
-      : _client = client ?? http.Client();
+    : _client = client ?? http.Client();
 
   // ---------------------------------------------------------------------------
   // Route Navigation & Geometry
@@ -109,7 +110,10 @@ class OsrmService {
 
     // Coordinates in OSRM format: "lng1,lat1;lng2,lat2;..."
     final String coordString = waypoints
-        .map((p) => '${p.longitude.toStringAsFixed(6)},${p.latitude.toStringAsFixed(6)}')
+        .map(
+          (p) =>
+              '${p.longitude.toStringAsFixed(6)},${p.latitude.toStringAsFixed(6)}',
+        )
         .join(';');
 
     final url = Uri.parse(
@@ -125,11 +129,16 @@ class OsrmService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['code'] == 'Ok' && data['routes'] is List && (data['routes'] as List).isNotEmpty) {
+        if (data['code'] == 'Ok' &&
+            data['routes'] is List &&
+            (data['routes'] as List).isNotEmpty) {
           final firstRoute = data['routes'][0];
-          final String encodedPolyline = firstRoute['geometry'] as String? ?? '';
-          final double duration = (firstRoute['duration'] as num?)?.toDouble() ?? 0.0;
-          final double distance = (firstRoute['distance'] as num?)?.toDouble() ?? 0.0;
+          final String encodedPolyline =
+              firstRoute['geometry'] as String? ?? '';
+          final double duration =
+              (firstRoute['duration'] as num?)?.toDouble() ?? 0.0;
+          final double distance =
+              (firstRoute['distance'] as num?)?.toDouble() ?? 0.0;
 
           final List<LatLng> decodedGeometry = encodedPolyline.isNotEmpty
               ? GeoUtils.decodePolyline(encodedPolyline)
@@ -144,7 +153,9 @@ class OsrmService {
         }
       }
 
-      debugPrint('OSRM returned unexpected status or code: ${response.statusCode}');
+      debugPrint(
+        'OSRM returned unexpected status or code: ${response.statusCode}',
+      );
       return _computeFallbackRoute(waypoints);
     } catch (e) {
       debugPrint('OSRM request error: $e');
@@ -226,7 +237,10 @@ class OsrmService {
   OsrmRouteResult _computeFallbackRoute(List<LatLng> waypoints) {
     double totalDistance = 0.0;
     for (int i = 0; i < waypoints.length - 1; i++) {
-      totalDistance += GeoUtils.haversineDistance(waypoints[i], waypoints[i + 1]);
+      totalDistance += GeoUtils.haversineDistance(
+        waypoints[i],
+        waypoints[i + 1],
+      );
     }
 
     final double estimatedDuration = totalDistance / fallbackScooterSpeedMps;

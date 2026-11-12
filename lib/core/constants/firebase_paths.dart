@@ -31,7 +31,8 @@ abstract final class FirebasePaths {
   static String stop(String stopId) => '$stopsCollection/$stopId';
 
   /// Path to a specific scheduled stop time: `stopTimes/{stopTimeId}`
-  static String stopTime(String stopTimeId) => '$stopTimesCollection/$stopTimeId';
+  static String stopTime(String stopTimeId) =>
+      '$stopTimesCollection/$stopTimeId';
 
   /// Path to an operator assignment document: `operatorAssignments/{assignmentId}`
   static String operatorAssignment(String assignmentId) =>
