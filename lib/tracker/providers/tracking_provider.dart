@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:fibus/core/constants/app_constants.dart';
 import 'package:fibus/services/location_service.dart';
 
 /// State management provider for active GPS location broadcasting in the Tracker app.
@@ -26,7 +27,39 @@ class TrackingProvider extends ChangeNotifier {
 
   /// Creates a [TrackingProvider] instance.
   TrackingProvider({LocationService? locationService})
-      : _locationService = locationService ?? LocationService.instance;
+      : _locationService = locationService ?? LocationService.instance {
+    _locationService.addListener(_onServiceChanged);
+  }
+
+  /// Mirrors upload confirmations and a service-side stop (for example when
+  /// another phone takes over) into this provider.
+  void _onServiceChanged() {
+    if (_isTracking && !_locationService.isTracking) {
+      _isTracking = false;
+      _durationTimer?.cancel();
+      _durationTimer = null;
+    }
+    notifyListeners();
+  }
+
+  /// When the server last confirmed an uploaded fix.
+  DateTime? get lastUploadConfirmedAt => _locationService.lastUploadConfirmedAt;
+
+  /// True when another phone took over this bus and tracking was stopped.
+  bool get superseded => _locationService.superseded;
+
+  /// Whether riders can currently see this bus: tracking, with an upload
+  /// confirmed by the server recently.
+  bool get ridersCanSee {
+    final at = lastUploadConfirmedAt;
+    return _isTracking &&
+        at != null &&
+        DateTime.now().difference(at).inSeconds <=
+            AppConstants.uploadFreshSeconds;
+  }
+
+  /// Checks location is on and permitted before a trip is claimed.
+  Future<void> ensureReady() => _locationService.ensureReady();
 
   // ---------------------------------------------------------------------------
   // Getters
@@ -87,8 +120,9 @@ class TrackingProvider extends ChangeNotifier {
 
   /// Initiates foreground GPS tracking and RTDB broadcasting for [busId].
   Future<void> startTracking(String busId, int sessionGeneration) async {
-    if (_isTracking && _activeBusId == busId) {
-      debugPrint('TrackingProvider: already tracking bus $busId');
+    if (_isTracking &&
+        _activeBusId == busId &&
+        _sessionGeneration == sessionGeneration) {
       return;
     }
 
@@ -154,6 +188,7 @@ class TrackingProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _locationService.removeListener(_onServiceChanged);
     _durationTimer?.cancel();
     _positionSubscription?.cancel();
     super.dispose();

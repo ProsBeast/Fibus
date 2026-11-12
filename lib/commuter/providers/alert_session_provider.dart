@@ -9,6 +9,7 @@ import 'package:fibus/services/bus_eta_estimator.dart';
 import 'package:fibus/services/firestore_service.dart';
 import 'package:fibus/services/notification_service.dart';
 import 'package:fibus/services/route_service.dart';
+import 'package:fibus/services/service_calendar.dart';
 
 /// What the alert state machine should do at a given moment (PRD §9.7).
 enum AlertAction { none, sendAdvance, sendLeaveNow, sendPlanChanged, complete }
@@ -100,7 +101,13 @@ class AlertSessionProvider extends ChangeNotifier {
 
   // Getters
   AlertSession? get activeSession => _activeSession;
-  bool get isActive => _activeSession?.isActive ?? false;
+
+  /// True only for a pending session that belongs to the service day the
+  /// dashboard is showing, never for a leftover from an earlier day.
+  bool get isActive {
+    final s = _activeSession;
+    return s != null && s.isActive && s.serviceDate == _targetServiceDate;
+  }
   AlertSessionStatus get currentState =>
       _activeSession?.status ?? AlertSessionStatus.inactive;
   bool get isLoading => _isLoading;
@@ -109,8 +116,13 @@ class AlertSessionProvider extends ChangeNotifier {
   /// False when Android notifications are blocked for Fibus (FR-29).
   bool get notificationsEnabled => _notificationsEnabled;
 
-  String get _todayServiceDate =>
-      DateFormat('yyyy-MM-dd').format(DateTime.now());
+  DateTime? _serviceDay;
+  String? _subscribedDate;
+
+  /// The service date (`yyyy-MM-dd`) alerts are for: today, or the next
+  /// service day once today's bus has gone. Follows [CommuteProvider].
+  String get _targetServiceDate =>
+      serviceDateKey(_serviceDay ?? DateTime.now());
 
   /// Initializes provider for current logged-in user.
   void initForUser(String uid) {
@@ -126,19 +138,22 @@ class AlertSessionProvider extends ChangeNotifier {
     _recommendation = commute.departureRecommendation;
     _preference = commute.currentPreference;
     _etaStatus = commute.etaEstimate.status;
+    _serviceDay = commute.serviceDay;
     final bus = commute.currentBus?.displayName;
     if (bus != null && bus.isNotEmpty) _busName = bus;
     final stop = commute.currentStop?.name;
     if (stop != null && stop.isNotEmpty) _stopName = stop;
   }
 
-  /// Listens to today's alert session from Firestore.
+  /// Listens to the alert session for the target service date.
   void _subscribeToActiveSession() {
     if (_activeUserId == null) return;
 
+    final date = _targetServiceDate;
+    _subscribedDate = date;
     _sessionSubscription?.cancel();
     _sessionSubscription = _firestore
-        .streamActiveAlertSession(_activeUserId!, _todayServiceDate)
+        .streamActiveAlertSession(_activeUserId!, date)
         .listen(
       (session) {
         _activeSession = session;
@@ -149,6 +164,29 @@ class AlertSessionProvider extends ChangeNotifier {
         developer.log('Alert session stream error', error: err);
       },
     );
+  }
+
+  /// Moves to a new service date: when midnight passes, or when today's bus
+  /// has gone and the dashboard turns to the next service day. The previous
+  /// day's session is closed so it can never look like live alerts.
+  Future<void> _rollOver() async {
+    final old = _activeSession;
+    _activeSession = null;
+    _resetBookkeeping();
+    if (old != null && old.isActive && old.id.isNotEmpty) {
+      await _cancelScheduled();
+      _persist(old.copyWith(status: AlertSessionStatus.completed));
+    }
+    _subscribeToActiveSession();
+    notifyListeners();
+  }
+
+  /// Saves without waiting. Firestore only completes a write when the
+  /// server confirms it, so awaiting here would stall alerts while offline.
+  void _persist(AlertSession session) {
+    unawaited(_firestore.updateAlertSession(session).catchError((Object e) {
+      developer.log('Failed to persist alert session', error: e);
+    }));
   }
 
   void _resetBookkeeping() {
@@ -171,6 +209,9 @@ class AlertSessionProvider extends ChangeNotifier {
     if (_acting) return;
     _acting = true;
     try {
+      if (_activeUserId != null && _subscribedDate != _targetServiceDate) {
+        await _rollOver();
+      }
       await _refreshPermission();
       await _checkAlertTriggers();
     } catch (e, stack) {
@@ -199,9 +240,12 @@ class AlertSessionProvider extends ChangeNotifier {
 
   Future<void> _checkAlertTriggers() async {
     final session = _activeSession;
-    if (session == null || !session.isActive) return;
+    if (session == null || !isActive) return;
 
     final rec = _recommendation;
+    // "The bus passed your stop" is about today's run only; it must not
+    // close a session armed for the next service day.
+    final sessionIsToday = session.serviceDate == serviceDateKey(DateTime.now());
     final leaveBy = rec?.recommendedLeaveBy ?? session.recommendedLeaveBy;
     if (leaveBy == null) return;
     final now = DateTime.now();
@@ -212,7 +256,7 @@ class AlertSessionProvider extends ChangeNotifier {
       now: now,
       leaveBy: leaveBy,
       advanceWarningMinutes: lead,
-      etaStatus: _etaStatus,
+      etaStatus: sessionIsToday ? _etaStatus : LiveEtaStatus.noTracker,
       leaveByWhenLeaveNowSent: _leaveByWhenLeaveNowSent ?? session.recommendedLeaveBy,
       lastPlanChangeSentAt: _lastPlanChangeSentAt,
       isDelaySignificant: rec?.isDelaySignificant ?? false,
@@ -338,14 +382,12 @@ class AlertSessionProvider extends ChangeNotifier {
     _persistedLeaveBy = updated.recommendedLeaveBy;
     _lastPersistAt = DateTime.now();
     notifyListeners();
-    try {
-      await _firestore.updateAlertSession(updated);
-    } catch (e) {
-      developer.log('Failed to persist alert session', error: e);
-    }
+    _persist(updated);
   }
 
-  /// Activates departure monitoring alerts for today.
+  /// Turns alerts on for the target service date. One session per commuter
+  /// per date (a fixed document id), so repeated taps cannot create copies.
+  /// Works offline: alerts are local, and the record syncs later.
   Future<void> activateAlerts({
     required CommutePreference preference,
     DepartureRecommendation? recommendation,
@@ -360,12 +402,15 @@ class AlertSessionProvider extends ChangeNotifier {
       await _notifications.requestPermission();
       await _refreshPermission(force: true);
 
+      if (_subscribedDate != _targetServiceDate) await _rollOver();
+
       final rec = recommendation ?? _recommendation;
+      final date = _targetServiceDate;
       final session = AlertSession(
-        id: '',
+        id: '${_activeUserId!}_$date',
         commuterUid: _activeUserId!,
         preferenceId: preference.id,
-        serviceDate: _todayServiceDate,
+        serviceDate: date,
         busId: preference.busId,
         routeId: preference.routeId,
         boardingStopId: preference.boardingStopId,
@@ -379,10 +424,13 @@ class AlertSessionProvider extends ChangeNotifier {
         recommendedLeaveBy: rec?.recommendedLeaveBy,
       );
 
-      final sessionId = await _firestore.createAlertSession(session);
       _resetBookkeeping();
-      _activeSession = session.copyWith(id: sessionId);
+      _activeSession = session;
       _persistedLeaveBy = session.recommendedLeaveBy;
+      unawaited(_firestore.createAlertSession(session).catchError((Object e) {
+        developer.log('Failed to save alert session', error: e);
+        return session.id;
+      }));
 
       _isLoading = false;
       notifyListeners();
@@ -391,7 +439,7 @@ class AlertSessionProvider extends ChangeNotifier {
       unawaited(_tick());
     } catch (e, stack) {
       developer.log('Failed to activate alerts', error: e, stackTrace: stack);
-      _errorMessage = 'Could not activate alerts for today.';
+      _errorMessage = 'Could not turn on alerts';
       _isLoading = false;
       notifyListeners();
       rethrow;
@@ -407,12 +455,14 @@ class AlertSessionProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _firestore.cancelAlertSession(sessionId);
       await _notifications.cancelAll();
       _activeSession = _activeSession?.copyWith(status: AlertSessionStatus.cancelled);
       _resetBookkeeping();
       _isLoading = false;
       notifyListeners();
+      unawaited(_firestore.cancelAlertSession(sessionId).catchError((Object e) {
+        developer.log('Failed to save alert cancellation', error: e);
+      }));
     } catch (e, stack) {
       developer.log('Failed to cancel alerts', error: e, stackTrace: stack);
       _errorMessage = 'Could not cancel alerts.';

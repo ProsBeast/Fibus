@@ -10,6 +10,7 @@ import 'package:fibus/models/live_bus.dart';
 import 'package:fibus/models/route_model.dart';
 import 'package:fibus/models/stop_model.dart';
 import 'package:fibus/services/bus_eta_estimator.dart';
+import 'package:fibus/services/service_calendar.dart';
 
 /// Where the bus is and when it reaches your stop, with the route strip
 /// and an honest line about where the time comes from (FR-19, FR-27).
@@ -116,7 +117,14 @@ class BusEtaCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Reaches $stopName', style: t.labelMedium),
+                    Text(
+                      busEta == null ||
+                              relativeDayLabel(busEta!, DateTime.now()).isEmpty
+                          ? 'Reaches $stopName'
+                          : 'Reaches $stopName '
+                              '${relativeDayLabel(busEta!, DateTime.now())}',
+                      style: t.labelMedium,
+                    ),
                     const SizedBox(height: FibusSpace.s4),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.baseline,

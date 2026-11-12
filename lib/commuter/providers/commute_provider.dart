@@ -6,10 +6,12 @@ import 'package:fibus/models/commute_preference.dart';
 import 'package:fibus/models/live_bus.dart';
 import 'package:fibus/models/route_model.dart';
 import 'package:fibus/models/stop_model.dart';
+import 'package:fibus/core/constants/app_constants.dart';
 import 'package:fibus/services/bus_eta_estimator.dart';
 import 'package:fibus/services/firestore_service.dart';
 import 'package:fibus/services/rtdb_service.dart';
 import 'package:fibus/services/route_service.dart';
+import 'package:fibus/services/service_calendar.dart';
 
 /// Provider managing the commuter's saved preferences, live bus stream subscription,
 /// scooter travel estimation, and real-time departure countdown.
@@ -35,6 +37,7 @@ class CommuteProvider extends ChangeNotifier {
   List<StopModel> _routeStops = const [];
   BusEtaEstimator? _etaEstimator;
   BusEtaEstimate _etaEstimate = BusEtaEstimate.noTracker;
+  DateTime? _serviceDay;
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -65,6 +68,10 @@ class CommuteProvider extends ChangeNotifier {
     if (_etaEstimate.status == LiveEtaStatus.noTracker) return null;
     return (along / e.routeLengthMeters).clamp(0.0, 1.0);
   }
+
+  /// The calendar day of the bus run the dashboard is about: today, or the
+  /// next service day once today's bus has gone.
+  DateTime? get serviceDay => _serviceDay;
 
   /// Live ETA quality and prediction for the boarding stop.
   BusEtaEstimate get etaEstimate => _etaEstimate;
@@ -200,38 +207,50 @@ class CommuteProvider extends ChangeNotifier {
     if (_currentPreference == null) return;
 
     final now = DateTime.now();
-    DateTime? scheduledArrival;
-    if (_currentStop != null) {
-      scheduledArrival = _parseTodayScheduleTime(_currentStop!.scheduledArrivalLocalTime);
-    }
+    final stop = _currentStop;
 
-    _etaEstimate = _currentStop == null
+    _etaEstimate = stop == null
         ? BusEtaEstimate.noTracker
-        : (_etaEstimator?.estimate(_liveBus, _currentStop!.id, now) ??
+        : (_etaEstimator?.estimate(_liveBus, stop.id, now) ??
             BusEtaEstimate.noTracker);
 
-    final effectiveEta = _etaEstimate.eta ??
-        scheduledArrival ??
-        now.add(const Duration(minutes: 30));
+    // Timetable time to fall back on. While today's trip is being tracked
+    // (even with poor GPS) it stays on today. With no tracker it moves to
+    // the next service day once today's time is well past, and at once when
+    // the bus was seen passing the stop, so the dashboard never tells the
+    // commuter they are hours late for a bus that has gone.
+    DateTime? scheduled;
+    if (stop != null) {
+      final time = parseHhMm(stop.scheduledArrivalLocalTime);
+      final today = time == null
+          ? null
+          : DateTime(now.year, now.month, now.day, time.hour, time.minute);
+      final status = _etaEstimate.status;
+      final tripRunningToday = status == LiveEtaStatus.live ||
+          status == LiveEtaStatus.warmingUp ||
+          status == LiveEtaStatus.stale ||
+          status == LiveEtaStatus.offRoute;
+      scheduled = tripRunningToday
+          ? today
+          : nextServiceArrival(
+              hhmm: stop.scheduledArrivalLocalTime,
+              serviceDays: _currentBus?.serviceDays ?? const [],
+              now: now,
+              grace: AppConstants.scheduleGrace,
+              skipToday: status == LiveEtaStatus.passedStop,
+            );
+    }
+
+    final effectiveEta =
+        _etaEstimate.eta ?? scheduled ?? now.add(const Duration(minutes: 30));
+    _serviceDay = DateTime(
+        effectiveEta.year, effectiveEta.month, effectiveEta.day);
 
     _departureRecommendation = _routeService.computeDeparture(
       busEta: effectiveEta,
       scooterDurationSeconds: _scooterDurationSeconds,
-      scheduledArrival: scheduledArrival,
+      scheduledArrival: scheduled,
     );
-  }
-
-  /// Converts a timetable string (e.g. '07:50') to a DateTime for today.
-  DateTime _parseTodayScheduleTime(String timeString) {
-    final now = DateTime.now();
-    try {
-      final parts = timeString.split(':');
-      final hour = int.parse(parts[0].trim());
-      final minute = int.parse(parts[1].trim());
-      return DateTime(now.year, now.month, now.day, hour, minute);
-    } catch (_) {
-      return DateTime(now.year, now.month, now.day, 7, 50);
-    }
   }
 
   /// Timer ticking every second to refresh UI countdown smoothly.

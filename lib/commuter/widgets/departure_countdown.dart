@@ -5,6 +5,7 @@ import 'package:fibus/core/theme/fibus_palette.dart';
 import 'package:fibus/core/theme/fibus_theme.dart';
 import 'package:fibus/core/widgets/fib_card.dart';
 import 'package:fibus/services/route_service.dart';
+import 'package:fibus/services/service_calendar.dart';
 
 /// Formats a time as `7:41` plus a lowercase `am`, timetable style.
 ({String clock, String meridiem}) splitTime(DateTime t) => (
@@ -12,9 +13,10 @@ import 'package:fibus/services/route_service.dart';
       meridiem: DateFormat('a').format(t).toLowerCase(),
     );
 
-/// `18 min`, `1 h 05 min`.
+/// `18 min`, `1 h 05 min`, `3 days`.
 String formatDuration(Duration d) {
   final m = d.inMinutes.abs();
+  if (m >= 48 * 60) return '${m ~/ (24 * 60)} days';
   if (m >= 60) return '${m ~/ 60} h ${(m % 60).toString().padLeft(2, '0')} min';
   return '$m min';
 }
@@ -44,6 +46,8 @@ class DepartureCountdown extends StatelessWidget {
     }
 
     final leaveNow = rec.isLeaveNow;
+    final day = relativeDayLabel(rec.recommendedLeaveBy, DateTime.now());
+    final leaveLabel = day.isEmpty ? 'Leave by' : 'Leave $day by';
     final leave = splitTime(rec.recommendedLeaveBy);
     final eta = splitTime(rec.busEta);
     final untilLeave = rec.recommendedLeaveBy.difference(DateTime.now());
@@ -64,7 +68,7 @@ class DepartureCountdown extends StatelessWidget {
       liveRegion: leaveNow,
       label: leaveNow
           ? 'Leave now. $countdown'
-          : 'Leave by ${leave.clock} ${leave.meridiem}. $countdown',
+          : '$leaveLabel ${leave.clock} ${leave.meridiem}. $countdown',
       child: ExcludeSemantics(
         child: FibCard(
           borderColor: leaveNow ? c.accent : null,
@@ -73,7 +77,7 @@ class DepartureCountdown extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(leaveNow ? 'Leave now' : 'Leave by',
+              Text(leaveNow ? 'Leave now' : leaveLabel,
                   style: t.labelMedium?.copyWith(
                       color: leaveNow ? c.accentInk : c.textSecondary)),
               const SizedBox(height: FibusSpace.s4),

@@ -12,6 +12,7 @@ import 'package:fibus/core/widgets/fibus_wordmark.dart';
 import 'package:fibus/models/alert_session.dart';
 import 'package:fibus/models/commute_preference.dart';
 import 'package:fibus/services/auth_service.dart';
+import 'package:fibus/services/service_calendar.dart';
 
 /// Today's commute: when to leave, where the bus is, today's alerts, map.
 class DashboardScreen extends StatefulWidget {
@@ -44,7 +45,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (alertProvider.isActive) {
       await alertProvider.cancelAlerts();
       messenger.showSnackBar(
-        const SnackBar(content: Text('Alerts off for today')),
+        const SnackBar(content: Text('Alerts off')),
       );
       return;
     }
@@ -56,7 +57,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         recommendation: commuteProvider.departureRecommendation,
       );
       messenger.showSnackBar(
-        const SnackBar(content: Text('Alerts on for today')),
+        const SnackBar(content: Text('Alerts on')),
       );
     } catch (_) {
       messenger.showSnackBar(
@@ -119,6 +120,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(height: FibusSpace.s12),
                     _AlertsCard(
                       alerts: alerts,
+                      dayLabel: commute.serviceDay == null
+                          ? ''
+                          : relativeDayLabel(commute.serviceDay!, DateTime.now()),
                       leadMinutes: pref.advanceWarningMinutes,
                       onToggle: alerts.isLoading ? null : _toggleAlerts,
                     ),
@@ -175,11 +179,15 @@ class _SetupCard extends StatelessWidget {
 class _AlertsCard extends StatelessWidget {
   const _AlertsCard({
     required this.alerts,
+    required this.dayLabel,
     required this.leadMinutes,
     required this.onToggle,
   });
 
   final AlertSessionProvider alerts;
+
+  /// Empty for today, else `tomorrow` or a weekday name.
+  final String dayLabel;
   final int leadMinutes;
   final VoidCallback? onToggle;
 
@@ -224,7 +232,8 @@ class _AlertsCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Alerts for today', style: t.titleSmall),
+                Text('Alerts for ${dayLabel.isEmpty ? 'today' : dayLabel}',
+                    style: t.titleSmall),
                 const SizedBox(height: FibusSpace.s4),
                 Text(
                   blocked

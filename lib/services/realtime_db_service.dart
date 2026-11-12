@@ -169,13 +169,23 @@ class RealtimeDbService {
         'timestamp': nowMs,
       };
 
-      await Future.wait([
-        _db.ref(FirebasePaths.activeSession(busId)).set(sessionData),
-        _db.ref(FirebasePaths.liveBus(busId)).update(busData),
-      ]);
+      // liveBuses is the rule-checked claim; only record the session once
+      // that claim was accepted, so a rejected start leaves nothing behind.
+      await _db.ref(FirebasePaths.liveBus(busId)).update(busData);
+      await _db.ref(FirebasePaths.activeSession(busId)).set(sessionData);
     } catch (e) {
       debugPrint('RealtimeDbService.createSession error for $busId: $e');
       rethrow;
+    }
+  }
+
+  /// Drops writes still waiting for a connection, so a start that timed out
+  /// offline cannot turn into a ghost trip when the network returns.
+  Future<void> purgePendingWrites() async {
+    try {
+      await _db.purgeOutstandingWrites();
+    } catch (e) {
+      debugPrint('RealtimeDbService.purgePendingWrites error: $e');
     }
   }
 

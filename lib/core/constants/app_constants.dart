@@ -22,9 +22,34 @@ abstract final class AppConstants {
   static const int smoothingWindowSeconds = 180;
   static const Duration smoothingWindow = Duration(seconds: smoothingWindowSeconds);
 
-  /// Maximum acceptable GPS fix horizontal accuracy in meters.
-  /// Fixes with accuracy worse (higher) than 50m are rejected.
-  static const double minAccuracyMeters = 50.0;
+  /// Worst horizontal accuracy the Tracker still uploads (PRD §9.2: 100 m).
+  /// Inside a bus, fixes of 50 to 100 m are common and still useful.
+  static const double minAccuracyMeters = 100.0;
+
+  /// The Tracker uploads at once when the bus moved this far...
+  static const double minPublishDistanceMeters = 3.0;
+
+  /// ...and at least this often while it stands still, well inside the
+  /// 60 s stale threshold.
+  static const int heartbeatSeconds = 15;
+
+  /// An upload not confirmed by the server within this time counts as
+  /// unconfirmed (it stays queued and is sent when the network returns).
+  static const int uploadTimeoutSeconds = 10;
+
+  /// Riders are told the bus is visible only if an upload was confirmed
+  /// this recently.
+  static const int uploadFreshSeconds = 45;
+
+  /// A trip the operator forgot to end is ended automatically after this.
+  static const Duration maxTripDuration = Duration(hours: 3);
+
+  /// With no live tracking, the timetable fallback moves on to the next
+  /// service day this long after today's scheduled time.
+  static const Duration scheduleGrace = Duration(minutes: 30);
+
+  /// How long the apps wait for a save or trip change to reach the server.
+  static const Duration saveTimeout = Duration(seconds: 10);
 
   /// Commuter-side ETA ignores fixes worse than this (PRD §9.2: 100 m).
   static const double maxEtaFixAccuracyMeters = 100.0;

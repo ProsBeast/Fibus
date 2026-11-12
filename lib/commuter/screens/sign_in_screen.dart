@@ -27,7 +27,17 @@ class _SignInScreenState extends State<SignInScreen> {
     try {
       final authService = context.read<AuthService>();
       final credential = await authService.signInWithGoogle();
-      if (credential == null || !mounted) return;
+      if (credential == null) {
+        // Null with an error set means it failed; null alone means the
+        // commuter closed the Google picker.
+        if (authService.errorMessage != null) {
+          messenger.showSnackBar(const SnackBar(
+              content: Text('Could not sign in. Check your connection '
+                  'and try again')));
+        }
+        return;
+      }
+      if (!mounted) return;
 
       final commuteProvider = context.read<CommuteProvider>();
       await commuteProvider.initForUser(credential.uid);

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:fibus/core/constants/app_constants.dart';
 import 'package:fibus/core/constants/firebase_paths.dart';
 import 'package:fibus/models/alert_session.dart';
 import 'package:fibus/models/bus_model.dart';
@@ -40,6 +41,18 @@ class FirestoreService {
 
   FirestoreService._internal({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
+
+  /// Waits for a write to reach the server, but not forever.
+  ///
+  /// Firestore applies a write to its on-device cache at once and only
+  /// completes the future when the server confirms it, which never happens
+  /// while offline. After [AppConstants.saveTimeout] the write is treated as
+  /// saved: it is in the cache and syncs when the network returns. A real
+  /// rejection (for example by the security rules) still throws.
+  Future<void> _commit(Future<void> write) => write.timeout(
+        AppConstants.saveTimeout,
+        onTimeout: () => debugPrint('Firestore write queued for sync'),
+      );
 
   // ---------------------------------------------------------------------------
   // User Profile CRUD
@@ -389,9 +402,9 @@ class FirestoreService {
   /// Saves or updates the commuter's primary preference document.
   Future<void> saveCommutePreference(CommutePreference preference) async {
     try {
-      await _firestore
+      await _commit(_firestore
           .doc(FirebasePaths.primaryCommutePreference(preference.userId))
-          .set(preference.toFirestore(), SetOptions(merge: true));
+          .set(preference.toFirestore(), SetOptions(merge: true)));
     } catch (e) {
       debugPrint('FirestoreService.saveCommutePreference error: $e');
       rethrow;
@@ -401,12 +414,13 @@ class FirestoreService {
   /// Saves only the home pin onto the commuter's primary preference.
   Future<void> saveHomePin(String uid, double latitude, double longitude) async {
     try {
-      await _firestore.doc(FirebasePaths.primaryCommutePreference(uid)).set({
+      await _commit(
+          _firestore.doc(FirebasePaths.primaryCommutePreference(uid)).set({
         'userId': uid,
         'homeLatitude': latitude,
         'homeLongitude': longitude,
         'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      }, SetOptions(merge: true)));
     } catch (e) {
       debugPrint('FirestoreService.saveHomePin error ($uid): $e');
       rethrow;
@@ -440,7 +454,7 @@ class FirestoreService {
       final docRef = _firestore
           .collection(FirebasePaths.alertSessionsCollection)
           .doc(session.id.isNotEmpty ? session.id : null);
-      await docRef.set(session.toFirestore());
+      await _commit(docRef.set(session.toFirestore()));
       return docRef.id;
     } catch (e) {
       debugPrint('FirestoreService.createAlertSession error: $e');
@@ -451,10 +465,11 @@ class FirestoreService {
   /// Marks an alert session as cancelled by the commuter.
   Future<void> cancelAlertSession(String sessionId) async {
     try {
-      await _firestore.doc(FirebasePaths.alertSession(sessionId)).update({
+      await _commit(
+          _firestore.doc(FirebasePaths.alertSession(sessionId)).update({
         'status': AlertSessionStatus.cancelled.toValue(),
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      }));
     } catch (e) {
       debugPrint('FirestoreService.cancelAlertSession error ($sessionId): $e');
       rethrow;
@@ -464,9 +479,9 @@ class FirestoreService {
   /// Updates an alert session document.
   Future<void> updateAlertSession(AlertSession session) async {
     try {
-      await _firestore
+      await _commit(_firestore
           .doc(FirebasePaths.alertSession(session.id))
-          .set(session.toFirestore(), SetOptions(merge: true));
+          .set(session.toFirestore(), SetOptions(merge: true)));
     } catch (e) {
       debugPrint('FirestoreService.updateAlertSession error (${session.id}): $e');
       rethrow;

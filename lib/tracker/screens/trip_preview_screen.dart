@@ -13,6 +13,7 @@ import 'package:fibus/models/bus_model.dart';
 import 'package:fibus/models/live_bus_model.dart';
 import 'package:fibus/models/route_model.dart';
 import 'package:fibus/models/stop_model.dart';
+import 'package:fibus/services/auth_service.dart';
 import 'package:fibus/services/firestore_service.dart';
 import 'package:fibus/services/realtime_db_service.dart';
 import 'package:fibus/tracker/providers/trip_lifecycle_provider.dart';
@@ -117,6 +118,13 @@ class _TripPreviewScreenState extends State<TripPreviewScreen> {
         final live = snapshot.data;
         final isLive = live?.isLive ?? false;
         final isStale = live?.isStale ?? false;
+        final myUid = context.read<AuthService>().currentUser?.uid;
+        // The feed is this operator's own, for example after the app was
+        // closed mid-trip. They may resume without waiting for a takeover.
+        final isMine = live != null && myUid != null && live.operatorUid == myUid;
+        final lifecycleNow = context.watch<TripLifecycleProvider>();
+        final trackingHere = lifecycleNow.isActive &&
+            lifecycleNow.currentBusId == widget.busId;
 
         return Scaffold(
           appBar: AppBar(title: Text(_bus!.displayName)),
@@ -137,17 +145,20 @@ class _TripPreviewScreenState extends State<TripPreviewScreen> {
                   ),
                 ],
               ),
-              if (isLive || isStale) ...[
+              if ((isLive || isStale) && !trackingHere) ...[
                 const SizedBox(height: FibusSpace.s16),
                 FibCard(
-                  color: isStale ? c.accentSoft : c.raised,
+                  color: isLive && !isMine ? c.raised : c.accentSoft,
                   borderColor: Colors.transparent,
                   padding: const EdgeInsets.all(FibusSpace.s16),
                   child: Text(
-                    isLive
-                        ? 'This bus is already being tracked from another phone'
-                        : 'The last tracker stopped sending over a minute ago. '
-                            'You can take over',
+                    isMine
+                        ? 'Your last trip on this bus was not ended. Resume '
+                            'to keep sharing it'
+                        : isLive
+                            ? 'This bus is being tracked from another phone'
+                            : 'The last tracker stopped sending over a minute '
+                                'ago. You can take over',
                     style: t.bodySmall?.copyWith(color: c.textPrimary),
                   ),
                 ),
@@ -193,23 +204,30 @@ class _TripPreviewScreenState extends State<TripPreviewScreen> {
                 color: c.background,
                 border: Border(top: BorderSide(color: c.hairline)),
               ),
-              child: isStale
+              child: trackingHere
                   ? FilledButton(
-                      onPressed: () => context.push('/takeover/${widget.busId}'),
-                      child: const Text('Take over tracking'),
+                      onPressed: () => context.go('/tracking/${widget.busId}'),
+                      child: const Text('Open tracking'),
                     )
-                  : Consumer<TripLifecycleProvider>(
-                      builder: (context, lifecycle, _) => FilledButton(
-                        onPressed: lifecycle.isProcessing || isLive
-                            ? null
-                            : _handleStartTracking,
-                        child: Text(lifecycle.isProcessing
-                            ? 'Starting'
-                            : isLive
-                                ? 'Already tracking'
-                                : 'Start tracking'),
-                      ),
-                    ),
+                  : isStale && !isMine
+                      ? FilledButton(
+                          onPressed: () =>
+                              context.push('/takeover/${widget.busId}'),
+                          child: const Text('Take over tracking'),
+                        )
+                      : FilledButton(
+                          onPressed:
+                              lifecycleNow.isProcessing || (isLive && !isMine)
+                                  ? null
+                                  : _handleStartTracking,
+                          child: Text(lifecycleNow.isProcessing
+                              ? 'Starting'
+                              : isMine && (isLive || isStale)
+                                  ? 'Resume tracking'
+                                  : isLive
+                                      ? 'Already tracking'
+                                      : 'Start tracking'),
+                        ),
             ),
           ),
         );

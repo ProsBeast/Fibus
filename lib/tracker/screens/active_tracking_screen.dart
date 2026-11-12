@@ -103,7 +103,31 @@ class _ActiveTrackingScreenState extends State<ActiveTrackingScreen> {
       });
     }
 
-    final sharing = tracking.isTracking && pos != null && tracking.secondsSinceLastFix < 60;
+    // Honest status: "visible" only when the server confirmed a recent upload.
+    final sharing = tracking.ridersCanSee;
+    final ended = !lifecycle.isActive && !lifecycle.isProcessing;
+    final String status;
+    String? statusDetail;
+    if (tracking.superseded) {
+      status = 'Another phone took over this bus';
+      statusDetail = 'Tracking stopped on this phone';
+    } else if (ended) {
+      status = lifecycle.autoEnded
+          ? 'Trip ended automatically'
+          : 'This trip has ended';
+      statusDetail = lifecycle.autoEnded
+          ? 'Trips end by themselves after 3 hours'
+          : null;
+    } else if (sharing) {
+      status = 'Riders can see this bus';
+    } else if (pos == null || tracking.secondsSinceLastFix >= 60) {
+      status = 'Waiting for a GPS fix';
+      statusDetail = 'Riders see the timetable until GPS returns';
+    } else {
+      status = 'No connection';
+      statusDetail = 'Riders see the timetable until the phone is back online';
+    }
+    final finished = tracking.superseded || ended;
 
     return PopScope(
       canPop: false,
@@ -142,11 +166,13 @@ class _ActiveTrackingScreenState extends State<ActiveTrackingScreen> {
                     ),
                     const SizedBox(width: FibusSpace.s12),
                     Expanded(
-                      child: Text(
-                        sharing
-                            ? 'Riders can see this bus'
-                            : 'Waiting for a GPS fix',
-                        style: t.titleLarge,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(status, style: t.titleLarge),
+                          if (statusDetail != null)
+                            Text(statusDetail, style: t.bodySmall),
+                        ],
                       ),
                     ),
                   ],
@@ -274,11 +300,21 @@ class _ActiveTrackingScreenState extends State<ActiveTrackingScreen> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
                 FibusSpace.page, FibusSpace.s12, FibusSpace.page, FibusSpace.s12),
-            child: OutlinedButton(
-              onPressed: lifecycle.isProcessing ? null : _confirmStopTracking,
-              style: OutlinedButton.styleFrom(foregroundColor: c.negative),
-              child: Text(lifecycle.isProcessing ? 'Ending' : 'End trip'),
-            ),
+            child: finished
+                ? FilledButton(
+                    onPressed: () async {
+                      // Clears local trip state after a takeover.
+                      if (lifecycle.isActive) await lifecycle.stopTrip(widget.busId);
+                      if (context.mounted) context.go('/buses');
+                    },
+                    child: const Text('Back to buses'),
+                  )
+                : OutlinedButton(
+                    onPressed:
+                        lifecycle.isProcessing ? null : _confirmStopTracking,
+                    style: OutlinedButton.styleFrom(foregroundColor: c.negative),
+                    child: Text(lifecycle.isProcessing ? 'Ending' : 'End trip'),
+                  ),
           ),
         ),
       ),

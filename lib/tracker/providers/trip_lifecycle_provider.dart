@@ -1,35 +1,45 @@
 import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+import 'package:fibus/core/constants/app_constants.dart';
 import 'package:fibus/services/auth_service.dart';
-import 'package:fibus/services/firestore_service.dart';
+import 'package:fibus/services/location_service.dart';
 import 'package:fibus/services/realtime_db_service.dart';
 import 'package:fibus/tracker/providers/tracking_provider.dart';
 
-/// Enumeration of possible states in the tracker operator's trip lifecycle.
-enum TripState {
-  /// No trip is currently underway. Ready to start or takeover.
-  idle,
+/// States in the tracker operator's trip lifecycle.
+enum TripState { idle, starting, active, stopping, error }
 
-  /// In the process of claiming an authoritative session and starting GPS hardware.
-  starting,
-
-  /// Live tracking is actively broadcasting GPS fixes to RTDB.
-  active,
-
-  /// In the process of tearing down GPS hardware and ending the RTDB session.
-  stopping,
-
-  /// An error occurred during a state transition.
-  error,
+/// Turns a failure while starting or ending a trip into a sentence the
+/// operator can act on. Kept pure so it can be unit-tested.
+String tripErrorMessage(Object error) {
+  if (error is LocationSetupException) return error.message;
+  if (error is TimeoutException) {
+    return 'No connection. Check mobile data and try again';
+  }
+  if (error is FirebaseException && error.code == 'permission-denied') {
+    return 'This bus is being tracked from another phone, or you are not '
+        'assigned to it';
+  }
+  return 'Could not start the trip. Try again';
 }
 
-/// State machine provider managing the bus trip lifecycle for bus operators.
+/// State machine for a bus trip: claim the session in the Realtime Database
+/// (the security rules decide who may), then run GPS via [TrackingProvider].
 ///
-/// Orchestrates authoritative session creation in RTDB, operator validation
-/// in Firestore, and coordination with [TrackingProvider] for GPS telemetry broadcasting.
+/// Order matters. Location is checked before anything is written, and a
+/// start that fails after the claim is rolled back, so riders never see a
+/// "tracking" bus that is not sending positions.
 class TripLifecycleProvider extends ChangeNotifier {
+  TripLifecycleProvider({
+    RealtimeDbService? rtdbService,
+    AuthService? authService,
+    TrackingProvider? trackingProvider,
+  })  : _rtdbService = rtdbService ?? RealtimeDbService(),
+        _authService = authService ?? AuthService.instance,
+        _trackingProvider = trackingProvider;
+
   final RealtimeDbService _rtdbService;
-  final FirestoreService _firestoreService;
   final AuthService _authService;
   TrackingProvider? _trackingProvider;
 
@@ -39,222 +49,139 @@ class TripLifecycleProvider extends ChangeNotifier {
   String? _error;
   bool _isProcessing = false;
   DateTime? _lastStartedAt;
+  Timer? _autoEndTimer;
+  bool _autoEnded = false;
 
-  /// Creates a [TripLifecycleProvider] with optional injected dependencies.
-  TripLifecycleProvider({
-    RealtimeDbService? rtdbService,
-    FirestoreService? firestoreService,
-    AuthService? authService,
-    TrackingProvider? trackingProvider,
-  })  : _rtdbService = rtdbService ?? RealtimeDbService(),
-        _firestoreService = firestoreService ?? FirestoreService(),
-        _authService = authService ?? AuthService.instance,
-        _trackingProvider = trackingProvider;
-
-  // ---------------------------------------------------------------------------
-  // Getters
-  // ---------------------------------------------------------------------------
-
-  /// Current lifecycle state of the trip.
   TripState get tripState => _tripState;
-
-  /// Target bus identifier associated with the current trip.
   String? get currentBusId => _currentBusId;
-
-  /// Current session generation counter.
   int get sessionGeneration => _sessionGeneration;
-
-  /// Human-readable error message if an operation failed.
   String? get error => _error;
-
-  /// Whether an asynchronous state transition is currently in progress.
   bool get isProcessing => _isProcessing;
-
-  /// Whether active tracking is currently broadcasting.
   bool get isActive => _tripState == TripState.active;
-
-  /// Timestamp when the current active trip commenced.
   DateTime? get lastStartedAt => _lastStartedAt;
 
-  // ---------------------------------------------------------------------------
-  // Dependency Injection Setter
-  // ---------------------------------------------------------------------------
+  /// True when the last trip was ended automatically after
+  /// [AppConstants.maxTripDuration].
+  bool get autoEnded => _autoEnded;
 
-  /// Updates reference to [TrackingProvider] when consumed via proxy provider.
   void updateTrackingProvider(TrackingProvider provider) {
     _trackingProvider = provider;
   }
 
-  // ---------------------------------------------------------------------------
-  // Trip Lifecycle Actions
-  // ---------------------------------------------------------------------------
+  /// Starts (or resumes) tracking [busId] as a new session.
+  Future<bool> startTrip(String busId) => _begin(busId);
 
-  /// Starts a new tracking trip for [busId].
-  ///
-  /// Verifies operator authorization in Firestore, queries or increments
-  /// the session generation counter in RTDB, creates the authoritative session,
-  /// and initiates GPS broadcasting via [TrackingProvider].
-  Future<bool> startTrip(String busId) async {
+  /// Takes over [busId] from a phone whose feed has gone quiet.
+  Future<bool> takeoverTrip(String busId) => _begin(busId);
+
+  Future<bool> _begin(String busId) async {
     if (_isProcessing) return false;
-
     _isProcessing = true;
     _error = null;
+    _autoEnded = false;
     _tripState = TripState.starting;
     notifyListeners();
 
+    var claimed = false;
     try {
       final user = _authService.currentUser;
-      if (user == null) {
-        throw Exception('Operator is not authenticated. Please sign in again.');
-      }
-
-      // 1. Check operator assignment authorization
-      final isAuthorized = await _firestoreService.isOperatorAssignedToBus(
-        user.uid,
-        busId,
-      );
-      if (!isAuthorized) {
-        debugPrint(
-          'Warning: Operator ${user.uid} is not explicitly assigned in Firestore, proceeding with pilot assignment bypass if bus exists.',
-        );
-      }
-
-      // 2. Fetch current generation and increment
-      final currentGen = await _rtdbService.getSessionGeneration(busId);
-      final newGen = currentGen + 1;
-
-      // 3. Atomically establish authoritative session in RTDB
-      await _rtdbService.createSession(
-        busId: busId,
-        operatorUid: user.uid,
-        generation: newGen,
-      );
-
-      // 4. Start GPS broadcasting
       final tracker = _trackingProvider;
-      if (tracker != null) {
-        await tracker.startTracking(busId, newGen);
-      } else {
-        throw StateError('TrackingProvider reference is not available.');
+      if (user == null || tracker == null) {
+        throw StateError('not signed in');
       }
+
+      // 1. Location must work before anything is announced to riders.
+      await tracker.ensureReady();
+      await tracker.stopTracking();
+
+      // 2. Claim a newer session. The database rules reject the claim when
+      //    another phone is live or this operator is not assigned.
+      final newGen = await _rtdbService
+              .getSessionGeneration(busId)
+              .timeout(AppConstants.saveTimeout) +
+          1;
+      await _rtdbService
+          .createSession(busId: busId, operatorUid: user.uid, generation: newGen)
+          .timeout(AppConstants.saveTimeout);
+      claimed = true;
+
+      // 3. Start GPS.
+      await tracker.startTracking(busId, newGen);
 
       _currentBusId = busId;
       _sessionGeneration = newGen;
       _lastStartedAt = DateTime.now();
       _tripState = TripState.active;
-      _isProcessing = false;
-      notifyListeners();
+      _autoEndTimer?.cancel();
+      _autoEndTimer = Timer(AppConstants.maxTripDuration, () => _autoEnd(busId));
       return true;
     } catch (e) {
-      debugPrint('TripLifecycleProvider.startTrip error: $e');
-      _error = 'Failed to start trip: $e';
+      debugPrint('TripLifecycleProvider: start failed: $e');
+      if (e is TimeoutException) {
+        // Do not let the queued claim turn into a ghost trip later.
+        await _rtdbService.purgePendingWrites();
+      } else if (claimed) {
+        // GPS failed after the claim: tell riders the trip is not running.
+        unawaited(_rtdbService.endSession(busId).catchError((_) {}));
+      }
+      _error = tripErrorMessage(e);
       _tripState = TripState.error;
+      return false;
+    } finally {
       _isProcessing = false;
       notifyListeners();
-      return false;
     }
   }
 
-  /// Stops the active tracking session for [busId].
+  Future<void> _autoEnd(String busId) async {
+    if (_tripState != TripState.active || _currentBusId != busId) return;
+    _autoEnded = true;
+    await stopTrip(busId);
+  }
+
+  /// Ends the trip: stops GPS, then marks the session ended for riders.
   ///
-  /// Halts GPS telemetry sampling, marks the RTDB session as ended,
-  /// and resets the trip state machine back to [TripState.idle].
+  /// Always returns the phone to idle. Offline, the "ended" write stays
+  /// queued and is delivered when the network returns.
   Future<bool> stopTrip(String busId) async {
     if (_isProcessing) return false;
-
     _isProcessing = true;
     _error = null;
     _tripState = TripState.stopping;
     notifyListeners();
 
+    _autoEndTimer?.cancel();
+    _autoEndTimer = null;
+    final superseded = _trackingProvider?.superseded ?? false;
     try {
-      // 1. Stop GPS hardware broadcasting
-      final tracker = _trackingProvider;
-      if (tracker != null) {
-        await tracker.stopTracking();
+      await _trackingProvider?.stopTracking();
+      // After a takeover the session belongs to the other phone; leave it.
+      if (!superseded) {
+        await _rtdbService.endSession(busId).timeout(AppConstants.saveTimeout);
       }
-
-      // 2. Conclude RTDB active session
-      await _rtdbService.endSession(busId);
-
+    } catch (e) {
+      debugPrint('TripLifecycleProvider: end not confirmed yet: $e');
+    } finally {
       _tripState = TripState.idle;
       _currentBusId = null;
       _isProcessing = false;
       notifyListeners();
-      return true;
-    } catch (e) {
-      debugPrint('TripLifecycleProvider.stopTrip error: $e');
-      _error = 'Failed to stop trip: $e';
-      _tripState = TripState.error;
-      _isProcessing = false;
-      notifyListeners();
-      return false;
     }
+    return true;
   }
 
-  /// Takes over an existing stale or orphaned tracking session for [busId].
-  ///
-  /// Increments the session generation number to invalidate previous operator
-  /// transmissions, re-claims authoritative RTDB ownership, and resumes tracking.
-  Future<bool> takeoverTrip(String busId) async {
-    if (_isProcessing) return false;
-
-    _isProcessing = true;
-    _error = null;
-    _tripState = TripState.starting;
-    notifyListeners();
-
-    try {
-      final user = _authService.currentUser;
-      if (user == null) {
-        throw Exception('Operator is not authenticated.');
-      }
-
-      // 1. Stop any local tracking currently running
-      await _trackingProvider?.stopTracking();
-
-      // 2. Query RTDB generation and bump by 1 to supersede old operator
-      final existingGen = await _rtdbService.getSessionGeneration(busId);
-      final takeoverGen = existingGen + 1;
-
-      // 3. Atomically overwrite active session with new operator and generation
-      await _rtdbService.createSession(
-        busId: busId,
-        operatorUid: user.uid,
-        generation: takeoverGen,
-      );
-
-      // 4. Start local GPS broadcasting with the bumped generation
-      final tracker = _trackingProvider;
-      if (tracker != null) {
-        await tracker.startTracking(busId, takeoverGen);
-      } else {
-        throw StateError('TrackingProvider reference is not available.');
-      }
-
-      _currentBusId = busId;
-      _sessionGeneration = takeoverGen;
-      _lastStartedAt = DateTime.now();
-      _tripState = TripState.active;
-      _isProcessing = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      debugPrint('TripLifecycleProvider.takeoverTrip error: $e');
-      _error = 'Takeover failed: $e';
-      _tripState = TripState.error;
-      _isProcessing = false;
-      notifyListeners();
-      return false;
-    }
-  }
-
-  /// Clears current error state and resets to idle if not tracking.
+  /// Clears the last error.
   void clearError() {
     _error = null;
     if (_tripState == TripState.error) {
       _tripState = _currentBusId != null ? TripState.active : TripState.idle;
     }
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _autoEndTimer?.cancel();
+    super.dispose();
   }
 }

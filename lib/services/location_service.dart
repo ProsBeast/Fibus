@@ -1,15 +1,28 @@
 import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:fibus/core/constants/app_constants.dart';
 import 'package:fibus/services/realtime_db_service.dart';
 
+/// Whether a fix should be uploaded: always when the bus moved, and at least
+/// every [AppConstants.heartbeatSeconds] while it stands still, so a bus
+/// waiting at a stop or signal never looks like lost GPS to riders.
+bool shouldPublishFix({
+  required double movedMeters,
+  required Duration? sinceLastPublish,
+}) {
+  if (sinceLastPublish == null) return true;
+  if (movedMeters >= AppConstants.minPublishDistanceMeters) return true;
+  return sinceLastPublish.inSeconds >= AppConstants.heartbeatSeconds;
+}
+
 /// GPS location broadcasting service for the Fibus Tracker application.
 ///
-/// Manages high-accuracy GPS streams via [Geolocator], enforces foreground
-/// service persistence via [FlutterForegroundTask], validates fixes against
-/// staleness/accuracy thresholds, and streams telemetry to Firebase RTDB.
+/// Samples GPS every few seconds whether or not the bus moves, filters poor
+/// fixes, uploads to the Realtime Database, and records whether each upload
+/// was confirmed so the UI never claims riders can see a bus they cannot.
 class LocationService extends ChangeNotifier {
   final RealtimeDbService _rtdbService;
 
@@ -22,6 +35,11 @@ class LocationService extends ChangeNotifier {
   String? _activeBusId;
   int? _activeSessionGeneration;
   String? _lastError;
+
+  Position? _lastPublishedPosition;
+  DateTime? _lastPublishAttemptAt;
+  DateTime? _lastUploadConfirmedAt;
+  bool _superseded = false;
 
   /// Singleton instance.
   static final LocationService _instance = LocationService._internal();
@@ -62,45 +80,59 @@ class LocationService extends ChangeNotifier {
   /// Last error message encountered during location tracking.
   String? get lastError => _lastError;
 
+  /// When the server last confirmed an uploaded fix for this session.
+  DateTime? get lastUploadConfirmedAt => _lastUploadConfirmedAt;
+
+  /// True once the server rejected an upload because another phone took
+  /// over this bus (or the operator was unassigned). Tracking is stopped.
+  bool get superseded => _superseded;
+
   // ---------------------------------------------------------------------------
   // Tracking Lifecycle
   // ---------------------------------------------------------------------------
 
+  /// Checks that location is on and permitted, asking the user if needed.
+  /// Call before claiming a trip so a refusal never leaves a ghost trip.
+  /// Throws a [LocationSetupException] with a message fit for the operator.
+  Future<void> ensureReady() => _ensureLocationPermissions();
+
   /// Starts foreground GPS tracking and RTDB broadcasting for [busId].
-  ///
-  /// Requests required device permissions, initiates foreground notification,
-  /// configures high-accuracy GPS sampling (5s interval, 3m filter), and
-  /// continuously broadcasts valid fixes to the RTDB.
   Future<void> startTracking({
     required String busId,
     required int sessionGeneration,
   }) async {
     if (_isTracking) {
-      debugPrint('LocationService: Already tracking bus $_activeBusId.');
-      if (_activeBusId == busId) return;
+      debugPrint('LocationService: already tracking a bus');
+      if (_activeBusId == busId &&
+          _activeSessionGeneration == sessionGeneration) {
+        return;
+      }
       await stopTracking();
     }
 
     _lastError = null;
+    _superseded = false;
+    _lastPublishedPosition = null;
+    _lastPublishAttemptAt = null;
+    _lastUploadConfirmedAt = null;
 
     try {
-      // 1. Verify and request GPS location permissions
       await _ensureLocationPermissions();
 
-      // 2. Initialize and start Foreground Task Notification
       await _initForegroundTask(busId);
       await FlutterForegroundTask.startService(
         serviceId: 256,
-        notificationTitle: 'Fibus Tracker Active',
-        notificationText: 'Tracking Bus $busId',
+        notificationTitle: 'Fibus Tracker is sharing this bus',
+        notificationText: 'Open to see status or end the trip',
       );
 
-      // 3. Configure GPS stream settings
+      // distanceFilter 0: deliver a fix every interval even when stationary.
+      // Uploads are throttled in [_onLocationReceived] instead.
       final LocationSettings locationSettings;
       if (defaultTargetPlatform == TargetPlatform.android) {
         locationSettings = AndroidSettings(
           accuracy: LocationAccuracy.high,
-          distanceFilter: 3,
+          distanceFilter: 0,
           intervalDuration: const Duration(
             seconds: AppConstants.gpsIntervalSeconds,
           ),
@@ -108,11 +140,10 @@ class LocationService extends ChangeNotifier {
       } else {
         locationSettings = const LocationSettings(
           accuracy: LocationAccuracy.high,
-          distanceFilter: 3,
+          distanceFilter: 0,
         );
       }
 
-      // 4. Subscribe to Geolocator position stream
       _positionSubscription = Geolocator.getPositionStream(
         locationSettings: locationSettings,
       ).listen(
@@ -142,7 +173,7 @@ class LocationService extends ChangeNotifier {
 
   /// Stops GPS sampling, cancels subscriptions, and terminates the foreground task.
   Future<void> stopTracking() async {
-    _positionSubscription?.cancel();
+    await _positionSubscription?.cancel();
     _positionSubscription = null;
 
     try {
@@ -168,69 +199,71 @@ class LocationService extends ChangeNotifier {
     required String busId,
     required int sessionGeneration,
   }) async {
-    // Quality check: Reject stale, inaccurate, or duplicate fixes
-    if (!_isValidFix(position)) {
-      debugPrint(
-        'Discarded GPS fix: acc=${position.accuracy}m, age=${DateTime.now().difference(position.timestamp).inSeconds}s',
-      );
-      return;
-    }
+    if (!_isValidFix(position)) return;
 
     _lastPosition = position;
     _lastPositionController.add(position);
     notifyListeners();
 
-    // Broadcast to RTDB
-    try {
-      await _rtdbService.publishLocation(
-        busId: busId,
-        lat: position.latitude,
-        lng: position.longitude,
-        speed: position.speed,
-        heading: position.heading,
-        accuracy: position.accuracy,
-        sessionGeneration: sessionGeneration,
-      );
+    final now = DateTime.now();
+    final last = _lastPublishedPosition;
+    final moved = last == null
+        ? double.infinity
+        : Geolocator.distanceBetween(last.latitude, last.longitude,
+            position.latitude, position.longitude);
+    if (!shouldPublishFix(
+      movedMeters: moved,
+      sinceLastPublish: _lastPublishAttemptAt == null
+          ? null
+          : now.difference(_lastPublishAttemptAt!),
+    )) {
+      return;
+    }
+    _lastPublishedPosition = position;
+    _lastPublishAttemptAt = now;
 
-      // Update foreground notification status with live metrics
-      final speedKmh = (position.speed * 3.6).toStringAsFixed(0);
-      final accM = position.accuracy.toStringAsFixed(0);
-      FlutterForegroundTask.updateService(
-        notificationTitle: 'Tracking Bus $busId',
-        notificationText: 'Live: $speedKmh km/h | Accuracy: ±${accM}m',
-      );
+    try {
+      // Offline, the write stays queued and this future would never finish;
+      // the timeout only stops us counting it as confirmed.
+      await _rtdbService
+          .publishLocation(
+            busId: busId,
+            lat: position.latitude,
+            lng: position.longitude,
+            speed: position.speed.isFinite ? position.speed : 0,
+            heading: position.heading.isFinite ? position.heading : 0,
+            accuracy: position.accuracy,
+            sessionGeneration: sessionGeneration,
+          )
+          .timeout(const Duration(seconds: AppConstants.uploadTimeoutSeconds));
+      _lastUploadConfirmedAt = DateTime.now();
+      notifyListeners();
+    } on TimeoutException {
+      debugPrint('Location upload not confirmed yet (no connection?)');
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') {
+        // Another phone claimed a newer session, or the assignment was removed.
+        _superseded = true;
+        debugPrint('Location upload rejected: this session was superseded');
+        await stopTracking();
+      } else {
+        debugPrint('Location upload failed: ${e.code}');
+      }
     } catch (e) {
-      debugPrint('Failed to publish location fix to RTDB: $e');
+      debugPrint('Location upload failed: $e');
     }
   }
 
-  /// Enforces validation criteria:
-  /// 1. Horizontal accuracy < 50 meters
-  /// 2. Age < 30 seconds
-  /// 3. Must not be an exact duplicate of the previous fix
+  /// Accepts a fix when its accuracy is within the PRD's 100 m limit, it is
+  /// recent, and it is not an exact repeat of the previous one.
   bool _isValidFix(Position position) {
-    // 1. Accuracy check
-    if (position.accuracy > AppConstants.minAccuracyMeters) {
-      return false;
-    }
+    if (position.accuracy > AppConstants.minAccuracyMeters) return false;
 
-    // 2. Age check
-    final now = DateTime.now();
-    final fixAge = now.difference(position.timestamp);
-    if (fixAge.inSeconds.abs() > AppConstants.maxFixAgeSeconds) {
-      return false;
-    }
+    final fixAge = DateTime.now().difference(position.timestamp);
+    if (fixAge.inSeconds.abs() > AppConstants.maxFixAgeSeconds) return false;
 
-    // 3. Duplicate check
     final last = _lastPosition;
-    if (last != null) {
-      final isSameLat = (last.latitude - position.latitude).abs() < 0.000005;
-      final isSameLng = (last.longitude - position.longitude).abs() < 0.000005;
-      final isSameTime = last.timestamp == position.timestamp;
-      if (isSameLat && isSameLng && isSameTime) {
-        return false;
-      }
-    }
+    if (last != null && last.timestamp == position.timestamp) return false;
 
     return true;
   }
@@ -240,26 +273,26 @@ class LocationService extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   Future<void> _ensureLocationPermissions() async {
-    final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      throw const LocationServiceDisabledException();
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      throw const LocationSetupException(
+          'Location is turned off. Turn it on in quick settings and try again');
     }
 
-    LocationPermission permission = await Geolocator.checkPermission();
+    var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        throw Exception('Location permission was denied by the user.');
-      }
     }
-
+    if (permission == LocationPermission.denied) {
+      throw const LocationSetupException(
+          'Fibus Tracker needs location permission to share the bus');
+    }
     if (permission == LocationPermission.deniedForever) {
-      throw Exception(
-        'Location permissions are permanently denied. Please enable them in system settings.',
-      );
+      throw const LocationSetupException(
+          'Location permission is blocked. Allow it for Fibus Tracker in '
+          'Android settings');
     }
 
-    // Check notification permission on Android 13+
+    // The foreground-service notification needs this on Android 13+.
     final notifPermission =
         await FlutterForegroundTask.checkNotificationPermission();
     if (notifPermission != NotificationPermission.granted) {
@@ -281,7 +314,7 @@ class LocationService extends ChangeNotifier {
         playSound: false,
       ),
       foregroundTaskOptions: ForegroundTaskOptions(
-        eventAction: ForegroundTaskEventAction.repeat(5000),
+        eventAction: ForegroundTaskEventAction.nothing(),
         autoRunOnBoot: false,
         allowWakeLock: true,
         allowWifiLock: true,
@@ -295,4 +328,13 @@ class LocationService extends ChangeNotifier {
     _lastPositionController.close();
     super.dispose();
   }
+}
+
+/// A location problem the operator can fix, with a message to show them.
+class LocationSetupException implements Exception {
+  const LocationSetupException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
 }

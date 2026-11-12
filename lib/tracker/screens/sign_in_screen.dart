@@ -23,8 +23,16 @@ class _SignInScreenState extends State<SignInScreen> {
       _errorMessage = null;
     });
     try {
-      final credential = await context.read<AuthService>().signInWithGoogle();
-      if (credential != null && mounted) context.go('/buses');
+      final auth = context.read<AuthService>();
+      final credential = await auth.signInWithGoogle();
+      if (!mounted) return;
+      if (credential != null) {
+        context.go('/buses');
+      } else if (auth.errorMessage != null) {
+        // Null with an error set means it failed, not that it was cancelled.
+        setState(() => _errorMessage =
+            'Could not sign in. Check your connection and try again');
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _errorMessage =
